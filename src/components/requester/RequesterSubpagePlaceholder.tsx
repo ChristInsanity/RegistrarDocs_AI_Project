@@ -15,17 +15,7 @@ export function RequesterSubpagePlaceholder({
   workflowNote,
 }: RequesterSubpagePlaceholderProps) {
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/dashboard/requester"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#174D32] transition-colors hover:text-[#246B45] focus:outline-none focus-visible:underline"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>Back to Dashboard</span>
-        </Link>
-      </div>
-
+    <div className="space-y-5">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
         <div className="inline-flex items-center gap-2 rounded-full border border-[#246B45]/25 bg-[#E6EFE8] px-3 py-1 text-xs font-semibold text-[#174D32]">
           <Clock className="h-3.5 w-3.5" aria-hidden="true" />

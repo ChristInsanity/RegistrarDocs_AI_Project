@@ -148,7 +148,7 @@ export function RecentRequestsSection({
                       </td>
                       <td className="px-6 py-3.5 text-right">
                         <Link
-                          href="/dashboard/requester/requests"
+                          href={`/dashboard/requester/requests?ref=${encodeURIComponent(req.referenceNumber)}`}
                           className="text-xs font-semibold text-[#174D32] hover:text-[#246B45] hover:underline"
                         >
                           View Details
@@ -185,7 +185,7 @@ export function RecentRequestsSection({
                   <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                     <span>Submitted: {req.submittedAt}</span>
                     <Link
-                      href="/dashboard/requester/requests"
+                      href={`/dashboard/requester/requests?ref=${encodeURIComponent(req.referenceNumber)}`}
                       className="font-semibold text-[#174D32] hover:text-[#246B45]"
                     >
                       View Details

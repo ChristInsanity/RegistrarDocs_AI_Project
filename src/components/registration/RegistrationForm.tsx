@@ -1,14 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   CheckCircle2,
   Eye,
   EyeOff,
-  Info,
-  RotateCcw,
 } from "lucide-react";
 import { StudentIdUploadField } from "@/components/registration/StudentIdUploadField";
 import {
@@ -39,6 +38,7 @@ const INITIAL_VALUES: RegistrationFormValues = {
 };
 
 export function RegistrationForm() {
+  const router = useRouter();
   const [values, setValues] = useState<RegistrationFormValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<RegistrationFormErrors>({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -48,8 +48,26 @@ export function RegistrationForm() {
     email: string;
     studentId: string;
   } | null>(null);
+  const [redirectSeconds, setRedirectSeconds] = useState(3);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    if (!submittedAccount) return;
+
+    const countdownInterval = window.setInterval(() => {
+      setRedirectSeconds((prev) => (prev > 1 ? prev - 1 : 1));
+    }, 1000);
+
+    const redirectTimer = window.setTimeout(() => {
+      router.push("/login");
+    }, 3000);
+
+    return () => {
+      window.clearInterval(countdownInterval);
+      window.clearTimeout(redirectTimer);
+    };
+  }, [submittedAccount, router]);
 
   const fullNameRef = useRef<HTMLInputElement>(null);
   const studentIdRef = useRef<HTMLInputElement>(null);
@@ -227,6 +245,7 @@ export function RegistrationForm() {
         return;
       }
 
+      setRedirectSeconds(3);
       setSubmittedAccount({
         email: payload?.user?.email ?? values.dnscEmail.trim(),
         studentId: payload?.user?.studentId ?? values.studentId.trim(),
@@ -244,16 +263,6 @@ export function RegistrationForm() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleReset = () => {
-    setValues(INITIAL_VALUES);
-    setErrors({});
-    setHasSubmitted(false);
-    setSubmitError(null);
-    setSubmittedAccount(null);
-    setShowPassword(false);
-    setShowConfirmPassword(false);
   };
 
   const inputBaseClass =
@@ -292,62 +301,67 @@ export function RegistrationForm() {
 
       {submittedAccount && (
         <div
-          role="status"
-          aria-live="polite"
-          className="mt-6 rounded-xl border border-[#174D32]/30 bg-[#E6EFE8]/75 p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="registration-success-title"
+          aria-describedby="registration-success-description"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#25352B]/50 p-4 backdrop-blur-xs"
         >
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#174D32] text-white">
-              <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-xl sm:p-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#E6EFE8] text-[#174D32]">
+              <CheckCircle2 className="h-8 w-8" aria-hidden="true" />
+            </div>
+
+            <span className="mt-4 inline-block rounded-full border border-[#246B45]/25 bg-[#E6EFE8] px-3 py-0.5 text-[11px] font-bold tracking-wide text-[#174D32] uppercase">
+              Status: Pending Approval
             </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-bold tracking-wide text-[#174D32] uppercase ring-1 ring-[#174D32]/20">
-                  Registration Submitted
-                </span>
-                <span className="rounded-full bg-[#F5F5EF] px-2.5 py-0.5 text-[11px] font-semibold text-[#25352B] ring-1 ring-slate-300/70">
-                  Status: Pending Approval
-                </span>
-              </div>
 
-              <p className="mt-2.5 text-sm font-semibold text-[#25352B]">
-                Your registration has been submitted and is awaiting
-                administrator approval.
-              </p>
+            <h2
+              id="registration-success-title"
+              className="mt-3 text-xl font-bold tracking-tight text-[#25352B] sm:text-2xl"
+            >
+              Registration Submitted Successfully
+            </h2>
 
-              <p className="mt-2 text-xs leading-relaxed text-slate-700">
-                Account for Student ID{" "}
+            <p
+              id="registration-success-description"
+              className="mt-2 text-sm leading-relaxed text-slate-600"
+            >
+              Your registration has been submitted. Please wait for
+              administrator approval before signing in to your account.
+            </p>
+
+            <div className="mt-4 rounded-xl border border-slate-200 bg-[#F5F5EF] px-4 py-3 text-left text-xs text-slate-700">
+              <p>
                 <strong className="font-semibold text-[#25352B]">
-                  {submittedAccount.studentId}
+                  Student ID:
                 </strong>{" "}
-                ({submittedAccount.email}) has been recorded with status{" "}
-                <strong className="font-semibold text-[#25352B]">
-                  pending_approval
-                </strong>
-                . Requester portal access will be enabled only after an
-                administrator reviews and approves your registration.
+                {submittedAccount.studentId}
               </p>
+              <p className="mt-1 truncate">
+                <strong className="font-semibold text-[#25352B]">
+                  DNSC Email:
+                </strong>{" "}
+                {submittedAccount.email}
+              </p>
+            </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#174D32] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45]"
-                >
-                  <span>Go to Login</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#174D32]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#174D32] transition-colors hover:bg-[#F5F5EF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45]"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Register Another Account</span>
-                </button>
-                <span className="inline-flex items-center gap-1 text-xs text-slate-600">
-                  <Info className="h-3.5 w-3.5 text-[#174D32]" aria-hidden="true" />
-                  <span>Your Student ID image was stored securely for review.</span>
-                </span>
-              </div>
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-4 text-xs font-medium text-[#174D32]"
+            >
+              Redirecting to the login page in {redirectSeconds}{" "}
+              {redirectSeconds === 1 ? "second" : "seconds"}...
+            </p>
+
+            <div className="mt-5">
+              <Link
+                href="/login"
+                className="inline-flex w-full items-center justify-center rounded-lg bg-[#174D32] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45] focus-visible:ring-offset-2"
+              >
+                Go to Login Now
+              </Link>
             </div>
           </div>
         </div>
