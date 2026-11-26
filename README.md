@@ -8,29 +8,24 @@
 
 ## Current Milestone Status
 
-**Milestone 1: Project Foundation + Public Landing Page (Complete)**
+**Milestone 4: Authentication, Supabase Integration, and RBAC Foundation (Aligned — Awaiting Supabase Project Credentials)**
 
-Implemented in this milestone:
-- Next.js (App Router), React, TypeScript, Tailwind CSS, Lucide React, and ESLint project foundation
-- Responsive public landing page with institutional visual identity
-- Sticky navigation bar with desktop links and accessible mobile menu
-- Hero section with primary/secondary calls to action and illustrative portal preview
-- Illustrative Document Information section (pending Registrar's Office confirmation)
-- 4-step How It Works workflow section and request-tracking status notice
-- Proposed Portal Benefits section
-- Interactive, accessible FAQ accordion
-- Institutional footer with dynamic copyright year
-- Temporary `/login` and `/register` route placeholders (no forms or authentication yet)
-
-Planned for upcoming milestones (not implemented yet):
-- Account registration, login, and authentication
-- Database and backend integration
-- Requester, staff, and admin dashboards
-- Online document-request submission and live request tracking
+Implemented across Milestones 1–4:
+- **Milestone 1:** Next.js App Router, React, TypeScript, Tailwind CSS, Lucide React, ESLint foundation, DNSC-inspired forest-green theme, and responsive public landing page
+- **Milestone 2:** Registration UI (`/register`) with Full Name, Student ID (digits & dash restriction), DNSC Email, Student ID image upload with local preview, Password/Confirm Password toggles, and Privacy Acknowledgment
+- **Milestone 3:** Login UI (`/login`) supporting Email or Student ID + Password, password visibility toggle, and Forgot Password placeholder
+- **Milestone 4 (Node.js + Supabase Aligned):**
+  - Supabase PostgreSQL schema, RLS policies, and private `student-ids` Storage bucket migration ([0001_profiles_rbac_storage.sql](supabase/migrations/0001_profiles_rbac_storage.sql))
+  - Supabase Auth SSR session management (`@supabase/ssr`), server-only Student ID → email resolution, login rate limiting, and logout
+  - Connected `/register` (`POST /api/auth/register`) with magic-byte image validation, private Supabase Storage upload, `requester` role, and `pending_approval` status
+  - Connected `/login` (`POST /api/auth/login`) with account status enforcement (`pending_approval`, `approved`, `needs_correction`, `rejected`, `invitation_pending`, `active`, `inactive`) and role-based redirects
+  - Protected role dashboard placeholders (`/dashboard`, `/dashboard/requester`, `/dashboard/staff`, `/dashboard/admin`) and protected RBAC API routes (`/api/auth/me`, `/api/requester/profile`, `/api/staff/status`, `/api/admin/status`)
+  - Development-only, idempotent Admin bootstrap script (`npm run seed:admin`)
 
 ## Technology Stack
 
-- **Framework:** Next.js (App Router)
+- **Runtime & Framework:** Node.js + Next.js (App Router)
+- **Backend Platform:** Supabase (PostgreSQL, Auth, Private Storage, RLS)
 - **UI Library:** React
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS (`@tailwindcss/postcss`)
@@ -44,12 +39,24 @@ Planned for upcoming milestones (not implemented yet):
 
 - Node.js (LTS / v20+ recommended)
 - npm
+- A Supabase project (PostgreSQL + Auth + Storage)
 
-### Installation
+### Installation & Supabase Setup
 
-```bash
-npm install
-```
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Copy `.env.example` to `.env.local` and fill in your Supabase project values:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` *(server-only; never expose to the browser)*
+3. Apply the SQL migration `supabase/migrations/0001_profiles_rbac_storage.sql` in the Supabase SQL Editor (or via Supabase CLI).
+4. Bootstrap the local development Admin account (`Admin@local.test` / `AdminPass123`, `role=admin`, `status=active`):
+   ```bash
+   npm run seed:admin
+   ```
+   > **Warning:** Development bootstrap credentials are strictly for local development and must be changed before any real deployment. The script refuses to run when `NODE_ENV=production`.
 
 ### Development
 

@@ -42,7 +42,12 @@ export function RegistrationForm() {
   const [values, setValues] = useState<RegistrationFormValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<RegistrationFormErrors>({});
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [demoValidated, setDemoValidated] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittedAccount, setSubmittedAccount] = useState<{
+    email: string;
+    studentId: string;
+  } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -111,14 +116,16 @@ export function RegistrationForm() {
     field: "fullName" | "studentId" | "dnscEmail" | "password" | "confirmPassword",
     value: string
   ) => {
-    if (demoValidated) setDemoValidated(false);
+    if (submittedAccount) setSubmittedAccount(null);
+    if (submitError) setSubmitError(null);
     const nextValues = { ...values, [field]: value };
     setValues(nextValues);
     revalidateFieldIfNeeded(field, nextValues);
   };
 
   const handlePrivacyChange = (checked: boolean) => {
-    if (demoValidated) setDemoValidated(false);
+    if (submittedAccount) setSubmittedAccount(null);
+    if (submitError) setSubmitError(null);
     const nextValues = { ...values, privacyAcknowledged: checked };
     setValues(nextValues);
     revalidateFieldIfNeeded("privacyAcknowledged", nextValues);
@@ -128,7 +135,8 @@ export function RegistrationForm() {
     file: File | null,
     validationError?: string
   ) => {
-    if (demoValidated) setDemoValidated(false);
+    if (submittedAccount) setSubmittedAccount(null);
+    if (submitError) setSubmitError(null);
     setValues((prev) => ({ ...prev, studentIdImage: file }));
     setErrors((prev) => {
       const updated = { ...prev };
@@ -162,28 +170,88 @@ export function RegistrationForm() {
     }
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
     setHasSubmitted(true);
+    setSubmitError(null);
 
     const validationErrors = validateRegistrationForm(values);
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      setDemoValidated(false);
+      setSubmittedAccount(null);
       focusFirstInvalidField(validationErrors);
       return;
     }
 
-    // UI-only milestone: no network request, no account creation, no file upload, no storage.
-    setDemoValidated(true);
+    setIsSubmitting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("fullName", values.fullName.trim());
+      formData.append("studentId", values.studentId.trim());
+      formData.append("dnscEmail", values.dnscEmail.trim());
+      formData.append("password", values.password);
+      formData.append("confirmPassword", values.confirmPassword);
+      formData.append(
+        "privacyAcknowledged",
+        String(values.privacyAcknowledged)
+      );
+      if (values.studentIdImage) {
+        formData.append("studentIdImage", values.studentIdImage);
+      }
+
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        body: formData,
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        fieldErrors?: RegistrationFormErrors;
+        user?: { email?: string; studentId?: string };
+      } | null;
+
+      if (!response.ok) {
+        if (payload?.fieldErrors) {
+          setErrors(payload.fieldErrors);
+          focusFirstInvalidField(payload.fieldErrors);
+        }
+        setSubmitError(
+          payload?.error ||
+            "Unable to submit your registration. Please review your details and try again."
+        );
+        setSubmittedAccount(null);
+        return;
+      }
+
+      setSubmittedAccount({
+        email: payload?.user?.email ?? values.dnscEmail.trim(),
+        studentId: payload?.user?.studentId ?? values.studentId.trim(),
+      });
+      setValues(INITIAL_VALUES);
+      setErrors({});
+      setHasSubmitted(false);
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+    } catch {
+      setSubmitError(
+        "A network error occurred while submitting your registration. Please check your connection and try again."
+      );
+      setSubmittedAccount(null);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
     setValues(INITIAL_VALUES);
     setErrors({});
     setHasSubmitted(false);
-    setDemoValidated(false);
+    setSubmitError(null);
+    setSubmittedAccount(null);
     setShowPassword(false);
     setShowConfirmPassword(false);
   };
@@ -209,7 +277,20 @@ export function RegistrationForm() {
         </p>
       </div>
 
-      {demoValidated && (
+      {submitError && (
+        <div
+          role="alert"
+          className="mt-6 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50/80 p-4 text-sm text-red-800"
+        >
+          <AlertCircle
+            className="mt-0.5 h-4 w-4 shrink-0 text-red-700"
+            aria-hidden="true"
+          />
+          <span>{submitError}</span>
+        </div>
+      )}
+
+      {submittedAccount && (
         <div
           role="status"
           aria-live="polite"
@@ -222,38 +303,49 @@ export function RegistrationForm() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-bold tracking-wide text-[#174D32] uppercase ring-1 ring-[#174D32]/20">
-                  UI Preview Only &middot; No Account Created
+                  Registration Submitted
                 </span>
                 <span className="rounded-full bg-[#F5F5EF] px-2.5 py-0.5 text-[11px] font-semibold text-[#25352B] ring-1 ring-slate-300/70">
-                  Planned Status: Pending Approval
+                  Status: Pending Approval
                 </span>
               </div>
 
               <p className="mt-2.5 text-sm font-semibold text-[#25352B]">
-                The registration form is valid. Actual account submission and
-                administrator approval will be available when the authentication
-                and backend services are implemented.
+                Your registration has been submitted and is awaiting
+                administrator approval.
               </p>
 
               <p className="mt-2 text-xs leading-relaxed text-slate-700">
-                Once connected, your registration will be submitted for
-                administrator verification. You will receive an email
-                notification at your DNSC email account when your registration
-                is approved or if further action is required.
+                Account for Student ID{" "}
+                <strong className="font-semibold text-[#25352B]">
+                  {submittedAccount.studentId}
+                </strong>{" "}
+                ({submittedAccount.email}) has been recorded with status{" "}
+                <strong className="font-semibold text-[#25352B]">
+                  pending_approval
+                </strong>
+                . Requester portal access will be enabled only after an
+                administrator reviews and approves your registration.
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#174D32] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45]"
+                >
+                  <span>Go to Login</span>
+                </Link>
                 <button
                   type="button"
                   onClick={handleReset}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-[#174D32]/30 bg-white px-3.5 py-2 text-xs font-semibold text-[#174D32] transition-colors hover:bg-[#F5F5EF] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45]"
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Reset Form</span>
+                  <span>Register Another Account</span>
                 </button>
                 <span className="inline-flex items-center gap-1 text-xs text-slate-600">
                   <Info className="h-3.5 w-3.5 text-[#174D32]" aria-hidden="true" />
-                  <span>No data or ID image was uploaded or saved.</span>
+                  <span>Your Student ID image was stored securely for review.</span>
                 </span>
               </div>
             </div>
@@ -577,9 +669,12 @@ export function RegistrationForm() {
         <div className="pt-1">
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center rounded-lg bg-[#174D32] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45] focus-visible:ring-offset-2 sm:text-base"
+            disabled={isSubmitting}
+            className="inline-flex w-full items-center justify-center rounded-lg bg-[#174D32] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
           >
-            Submit Registration for Approval
+            {isSubmitting
+              ? "Submitting Registration..."
+              : "Submit Registration for Approval"}
           </button>
         </div>
 
