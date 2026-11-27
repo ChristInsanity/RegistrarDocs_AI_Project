@@ -1,9 +1,14 @@
+import { generateSecureTemporaryPassword } from "@/lib/auth/temp-password";
 import {
   listAdminAuditLogs,
   recordAdminAuditLog,
   type AdminAuditLogRecord,
 } from "@/lib/db/admin-audit";
 import { createNotification } from "@/lib/db/notifications";
+import {
+  sendStaffOnboardingEmail,
+  type EmailDeliveryResult,
+} from "@/lib/email/mailer";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { AccountStatus, SafeUser, UserRole } from "@/types/auth";
 
@@ -441,17 +446,16 @@ export async function createStaffAccountByAdmin(input: {
   fullName: string;
   email: string;
   employeeId?: string;
-  password: string;
   status?: "active" | "invitation_pending";
+  loginUrl: string;
   adminUser: SafeUser;
 }): Promise<
-  | { ok: true; user: AdminUserRecord }
+  | { ok: true; user: AdminUserRecord; emailDelivery: EmailDeliveryResult }
   | { ok: false; status: number; error: string }
 > {
   const fullName = input.fullName.trim();
   const email = input.email.trim().toLowerCase();
   const employeeId = input.employeeId?.trim() || null;
-  const password = input.password;
   const status =
     input.status === "invitation_pending" ? "invitation_pending" : "active";
 
@@ -460,13 +464,6 @@ export async function createStaffAccountByAdmin(input: {
   }
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, status: 400, error: "A valid email address is required." };
-  }
-  if (!password || password.length < 8) {
-    return {
-      ok: false,
-      status: 400,
-      error: "Initial password must be at least 8 characters long.",
-    };
   }
 
   const admin = createSupabaseAdminClient();
@@ -501,10 +498,13 @@ export async function createStaffAccountByAdmin(input: {
     }
   }
 
+  // Generate cryptographically secure temporary password on the server (never saved to DB)
+  const temporaryPassword = generateSecureTemporaryPassword(14);
+
   const { data: createdAuth, error: authError } =
     await admin.auth.admin.createUser({
       email,
-      password,
+      password: temporaryPassword,
       email_confirm: true,
       user_metadata: { full_name: fullName, role: "staff" },
     });
@@ -521,11 +521,13 @@ export async function createStaffAccountByAdmin(input: {
     return {
       ok: false,
       status: 500,
-      error: authError?.message || "Unable to provision Staff authentication account.",
+      error:
+        authError?.message ||
+        "Unable to provision Staff authentication account.",
     };
   }
 
-  const { data: profileData, error: profileError } = await admin
+  let { data: profileData, error: profileError } = await admin
     .from("profiles")
     .insert({
       id: createdAuth.user.id,
@@ -535,9 +537,29 @@ export async function createStaffAccountByAdmin(input: {
       employee_id: employeeId,
       role: "staff",
       status,
+      must_change_password: true,
     })
     .select(BASE_PROFILE_SELECT)
     .single();
+
+  // Graceful fallback if migration 0006 has not been applied yet
+  if (profileError && isMissingColumn(profileError.message)) {
+    const fallback = await admin
+      .from("profiles")
+      .insert({
+        id: createdAuth.user.id,
+        full_name: fullName,
+        email,
+        student_id: null,
+        employee_id: employeeId,
+        role: "staff",
+        status,
+      })
+      .select(BASE_PROFILE_SELECT)
+      .single();
+    profileData = fallback.data;
+    profileError = fallback.error;
+  }
 
   if (profileError || !profileData) {
     // Roll back Auth user so we never leave orphaned accounts
@@ -553,21 +575,112 @@ export async function createStaffAccountByAdmin(input: {
     profileData as unknown as RawAdminProfileRow
   );
 
+  // Send branded onboarding email with temporary credentials
+  const emailDelivery = await sendStaffOnboardingEmail({
+    fullName: createdUser.fullName,
+    email: createdUser.email,
+    employeeId: createdUser.employeeId,
+    temporaryPassword,
+    loginUrl: input.loginUrl,
+  });
+
   await recordAdminAuditLog({
     actor: input.adminUser,
     action: "staff_account_created",
     entityType: "staff_account",
     entityId: createdUser.id,
     entityLabel: `${createdUser.fullName} (${createdUser.email})`,
-    description: `Created Staff account for ${createdUser.fullName} with status "${status}".`,
+    description: `Created Staff account for ${createdUser.fullName} (status: ${status}, onboarding email ${emailDelivery.sent ? "sent" : "not sent"}).`,
     previousValue: null,
     newValue: {
       email: createdUser.email,
       employeeId: createdUser.employeeId,
       role: "staff",
       status: createdUser.status,
+      mustChangePassword: true,
+      emailSent: emailDelivery.sent,
     },
   });
 
-  return { ok: true, user: createdUser };
+  return { ok: true, user: createdUser, emailDelivery };
+}
+
+/**
+ * Generates a fresh cryptographically secure temporary password, updates the
+ * eligible Staff member's Auth credentials, enforces `must_change_password = true`,
+ * and resends the branded Staff onboarding email.
+ */
+export async function resendStaffOnboardingEmail(input: {
+  staffUserId: string;
+  loginUrl: string;
+  adminUser: SafeUser;
+}): Promise<
+  | { ok: true; emailDelivery: EmailDeliveryResult }
+  | { ok: false; status: number; error: string }
+> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .select(BASE_PROFILE_SELECT)
+    .eq("id", input.staffUserId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, status: 404, error: "Staff account not found." };
+  }
+
+  const target = mapAdminUserRow(data as unknown as RawAdminProfileRow);
+  if (target.role !== "staff") {
+    return {
+      ok: false,
+      status: 400,
+      error: "Onboarding emails can only be resent to Staff accounts.",
+    };
+  }
+  if (target.status === "inactive") {
+    return {
+      ok: false,
+      status: 400,
+      error: "Activate this Staff account before resending onboarding credentials.",
+    };
+  }
+
+  const temporaryPassword = generateSecureTemporaryPassword(14);
+  const { error: updateAuthErr } = await admin.auth.admin.updateUserById(
+    target.id,
+    { password: temporaryPassword }
+  );
+
+  if (updateAuthErr) {
+    return {
+      ok: false,
+      status: 500,
+      error: "Unable to rotate temporary credentials right now.",
+    };
+  }
+
+  await admin
+    .from("profiles")
+    .update({ must_change_password: true })
+    .eq("id", target.id);
+
+  const emailDelivery = await sendStaffOnboardingEmail({
+    fullName: target.fullName,
+    email: target.email,
+    employeeId: target.employeeId,
+    temporaryPassword,
+    loginUrl: input.loginUrl,
+  });
+
+  await recordAdminAuditLog({
+    actor: input.adminUser,
+    action: "staff_onboarding_email_resent",
+    entityType: "staff_account",
+    entityId: target.id,
+    entityLabel: `${target.fullName} (${target.email})`,
+    description: `Resent Staff onboarding credentials to ${target.email} (${emailDelivery.sent ? "delivered" : "delivery failed"}).`,
+    newValue: { emailSent: emailDelivery.sent, mustChangePassword: true },
+  });
+
+  return { ok: true, emailDelivery };
 }

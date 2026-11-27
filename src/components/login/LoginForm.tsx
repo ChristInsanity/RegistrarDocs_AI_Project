@@ -45,7 +45,6 @@ export function LoginForm() {
     code?: AuthErrorCode;
   } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [showForgotNotice, setShowForgotNotice] = useState(false);
 
   const identifierRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -253,15 +252,12 @@ export function LoginForm() {
             >
               Password <span className="text-red-700">*</span>
             </label>
-            <button
-              type="button"
-              onClick={() => setShowForgotNotice((prev) => !prev)}
-              aria-expanded={showForgotNotice}
-              aria-controls="forgot-password-notice"
+            <Link
+              href="/forgot-password"
               className="rounded text-xs font-semibold text-[#174D32] underline-offset-2 transition-colors hover:text-[#246B45] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45]"
             >
               Forgot Password?
-            </button>
+            </Link>
           </div>
 
           <div className="relative mt-1.5">
@@ -308,27 +304,6 @@ export function LoginForm() {
               />
               <span>{errors.password}</span>
             </p>
-          )}
-
-          {showForgotNotice && (
-            <div
-              id="forgot-password-notice"
-              role="note"
-              className="mt-2.5 flex items-start gap-2 rounded-lg border border-[#246B45]/25 bg-[#F5F5EF] p-3 text-xs leading-relaxed text-slate-700"
-            >
-              <Info
-                className="mt-0.5 h-4 w-4 shrink-0 text-[#174D32]"
-                aria-hidden="true"
-              />
-              <span>
-                <strong className="font-semibold text-[#25352B]">
-                  Password Recovery (Upcoming):
-                </strong>{" "}
-                Password reset is not available yet. Once authentication is
-                connected, recovery instructions will be sent to your registered
-                DNSC email account.
-              </span>
-            </div>
           )}
         </div>
 

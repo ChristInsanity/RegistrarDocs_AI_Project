@@ -4,6 +4,7 @@ import {
   createStaffAccountByAdmin,
   listAdminUsers,
 } from "@/lib/db/admin-users";
+import { getAppBaseUrl } from "@/lib/email/mailer";
 import type { AuthErrorCode } from "@/types/auth";
 
 export async function GET() {
@@ -29,7 +30,6 @@ export async function POST(request: Request) {
     fullName?: unknown;
     email?: unknown;
     employeeId?: unknown;
-    password?: unknown;
     status?: unknown;
   };
   try {
@@ -41,13 +41,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const loginUrl = `${getAppBaseUrl(request)}/login`;
+
   const result = await createStaffAccountByAdmin({
     fullName: typeof body.fullName === "string" ? body.fullName : "",
     email: typeof body.email === "string" ? body.email : "",
     employeeId: typeof body.employeeId === "string" ? body.employeeId : undefined,
-    password: typeof body.password === "string" ? body.password : "",
     status:
       body.status === "invitation_pending" ? "invitation_pending" : "active",
+    loginUrl,
     adminUser: auth.user,
   });
 
@@ -65,5 +67,8 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ user: result.user }, { status: 201 });
+  return NextResponse.json(
+    { user: result.user, emailDelivery: result.emailDelivery },
+    { status: 201 }
+  );
 }

@@ -15,12 +15,23 @@ export const metadata: Metadata = {
     "Sign in to your RegistrarDocs AI account using your email or Student ID and password.",
 };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reset?: string; error?: string }>;
+}) {
   const user = await getAuthenticatedUser();
   if (user) {
-    redirect(getDashboardPathForRole(user.role));
+    redirect(
+      user.mustChangePassword
+        ? "/auth/change-password"
+        : getDashboardPathForRole(user.role)
+    );
   }
 
+  const params = await searchParams;
+  const resetSuccess = params.reset === "success";
+  const authError = params.error;
   const currentYear = new Date().getFullYear();
 
   return (
@@ -48,8 +59,27 @@ export default async function LoginPage() {
 
       <main
         id="main-content"
-        className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6 sm:py-14 lg:px-8"
+        className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-10 sm:px-6 sm:py-14 lg:px-8"
       >
+        {resetSuccess && (
+          <div
+            role="status"
+            className="w-full max-w-md rounded-xl border border-[#246B45]/30 bg-[#E6EFE8] px-4 py-3 text-xs font-semibold text-[#174D32] shadow-2xs"
+          >
+            Your password has been reset successfully. Please sign in with your
+            new password.
+          </div>
+        )}
+        {authError && (
+          <div
+            role="alert"
+            className="w-full max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-800 shadow-2xs"
+          >
+            {authError === "auth_callback_failed"
+              ? "Your sign-in link is invalid or has expired. Please sign in normally or request a new link."
+              : "Your account is not eligible to sign in right now. Please contact the Registrar's Office."}
+          </div>
+        )}
         <LoginForm />
       </main>
 

@@ -83,7 +83,8 @@ export type ApiAuthResult =
  * and optional role-based authorization.
  */
 export async function requireApiAuth(
-  allowedRoles?: readonly UserRole[]
+  allowedRoles?: readonly UserRole[],
+  options?: { allowPendingPasswordChange?: boolean }
 ): Promise<ApiAuthResult> {
   const user = await getAuthenticatedUser();
   if (!user) {
@@ -95,6 +96,20 @@ export async function requireApiAuth(
           code: "UNAUTHENTICATED" satisfies AuthErrorCode,
         },
         { status: 401 }
+      ),
+    };
+  }
+
+  if (user.mustChangePassword && !options?.allowPendingPasswordChange) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error:
+            "You must change your temporary password before accessing this resource.",
+          code: "PASSWORD_CHANGE_REQUIRED" satisfies AuthErrorCode,
+        },
+        { status: 403 }
       ),
     };
   }
@@ -125,6 +140,10 @@ export async function requirePageRole(
   const user = await getAuthenticatedUser();
   if (!user) {
     redirect("/login");
+  }
+
+  if (user.mustChangePassword) {
+    redirect("/auth/change-password");
   }
 
   if (user.role !== expectedRole) {

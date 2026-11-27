@@ -12,6 +12,7 @@ export interface ProfileRow {
   student_id_image_path: string | null;
   student_id_image_mime: string | null;
   student_id_image_size: number | null;
+  must_change_password?: boolean | null;
   created_at: string;
   updated_at: string;
   last_login_at: string | null;
@@ -26,6 +27,7 @@ export function toSafeUser(row: ProfileRow): SafeUser {
     employeeId: row.employee_id,
     role: row.role,
     status: row.status,
+    mustChangePassword: Boolean(row.must_change_password),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastLoginAt: row.last_login_at,

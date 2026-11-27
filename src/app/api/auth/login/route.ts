@@ -170,7 +170,9 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       user: safeUser,
-      redirectTo: getDashboardPathForRole(safeUser.role),
+      redirectTo: safeUser.mustChangePassword
+        ? "/auth/change-password"
+        : getDashboardPathForRole(safeUser.role),
     },
     { status: 200 }
   );

@@ -20,6 +20,7 @@ export interface SafeUser {
   employeeId: string | null;
   role: UserRole;
   status: AccountStatus;
+  mustChangePassword?: boolean;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -35,6 +36,7 @@ export type AuthErrorCode =
   | "ACCOUNT_REJECTED"
   | "ACCOUNT_INVITATION_PENDING"
   | "ACCOUNT_INACTIVE"
+  | "PASSWORD_CHANGE_REQUIRED"
   | "RATE_LIMITED"
   | "UNAUTHENTICATED"
   | "FORBIDDEN"
