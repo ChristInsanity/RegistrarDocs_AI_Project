@@ -29,6 +29,7 @@ import type { SafeUser } from "@/types/auth";
 
 interface DocumentCatalogAndRequestFlowProps {
   user: SafeUser;
+  catalog?: readonly DocumentCatalogItem[];
 }
 
 function DocumentTypeIcon({ code }: { code: DocumentTypeCode }) {
@@ -63,6 +64,7 @@ function createDraftIdempotencyKey(): string {
 
 export function DocumentCatalogAndRequestFlow({
   user,
+  catalog = DOCUMENT_CATALOG,
 }: DocumentCatalogAndRequestFlowProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<DocumentCatalogItem | null>(
@@ -96,15 +98,15 @@ export function DocumentCatalogAndRequestFlow({
 
   const filteredCatalog = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return DOCUMENT_CATALOG;
-    return DOCUMENT_CATALOG.filter(
+    if (!q) return catalog;
+    return catalog.filter(
       (item) =>
         item.name.toLowerCase().includes(q) ||
         item.shortLabel.toLowerCase().includes(q) ||
         item.category.toLowerCase().includes(q) ||
         item.shortDescription.toLowerCase().includes(q)
     );
-  }, [searchQuery]);
+  }, [catalog, searchQuery]);
 
   const handleSelectDocument = (doc: DocumentCatalogItem) => {
     setSelectedDoc(doc);

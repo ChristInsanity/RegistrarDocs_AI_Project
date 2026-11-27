@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ClipboardList, ShieldCheck } from "lucide-react";
+import { DnscAcademicCalendarSection } from "@/components/requester/DnscAcademicCalendarSection";
 import { StaffOverviewCards } from "@/components/staff/StaffOverviewCards";
 import { StaffRecentAttentionSection } from "@/components/staff/StaffRecentAttentionSection";
 import { requirePageRole } from "@/lib/auth/rbac";
@@ -81,6 +82,9 @@ export default async function StaffDashboardPage() {
         requests={attentionRequests}
         error={result.ok ? null : result.error}
       />
+
+      {/* DNSC Academic Calendar */}
+      <DnscAcademicCalendarSection />
     </div>
   );
 }

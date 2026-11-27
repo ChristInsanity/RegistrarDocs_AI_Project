@@ -73,7 +73,17 @@ export function NotificationCategoryIcon({
   }
 }
 
-export function NotificationQuickPanel() {
+interface NotificationQuickPanelProps {
+  apiEndpoint?: string;
+  viewAllHref?: string;
+  requestsHref?: string;
+}
+
+export function NotificationQuickPanel({
+  apiEndpoint = "/api/requester/notifications",
+  viewAllHref = "/dashboard/requester/notifications",
+  requestsHref = "/dashboard/requester/requests",
+}: NotificationQuickPanelProps = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -90,7 +100,7 @@ export function NotificationQuickPanel() {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/requester/notifications?limit=6&offset=0", {
+      const res = await fetch(`${apiEndpoint}?limit=6&offset=0`, {
         cache: "no-store",
       });
       if (!res.ok) {
@@ -110,17 +120,16 @@ export function NotificationQuickPanel() {
     } finally {
       if (showLoading) setLoading(false);
     }
-  }, []);
+  }, [apiEndpoint]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadInitial() {
       try {
-        const res = await fetch(
-          "/api/requester/notifications?limit=6&offset=0",
-          { cache: "no-store" }
-        );
+        const res = await fetch(`${apiEndpoint}?limit=6&offset=0`, {
+          cache: "no-store",
+        });
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as {
           notifications: PersistedNotification[];
@@ -144,7 +153,7 @@ export function NotificationQuickPanel() {
       cancelled = true;
       window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, handleSync);
     };
-  }, [fetchNotifications]);
+  }, [apiEndpoint, fetchNotifications]);
 
   useEffect(() => {
     if (!open) return;
@@ -181,7 +190,7 @@ export function NotificationQuickPanel() {
     if (markingAll || unreadCount === 0) return;
     setMarkingAll(true);
     try {
-      const res = await fetch("/api/requester/notifications", {
+      const res = await fetch(apiEndpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_all_read" }),
@@ -203,7 +212,7 @@ export function NotificationQuickPanel() {
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
       try {
-        const res = await fetch("/api/requester/notifications", {
+        const res = await fetch(apiEndpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -226,10 +235,10 @@ export function NotificationQuickPanel() {
     setOpen(false);
     if (item.requestReference) {
       router.push(
-        `/dashboard/requester/requests?ref=${encodeURIComponent(item.requestReference)}`
+        `${requestsHref}?ref=${encodeURIComponent(item.requestReference)}`
       );
     } else {
-      router.push("/dashboard/requester/notifications");
+      router.push(viewAllHref);
     }
   };
 
@@ -380,7 +389,7 @@ export function NotificationQuickPanel() {
           {/* Distinct View All Notifications Footer Link */}
           <div className="border-t border-slate-100 bg-[#F5F5EF]/60 px-4 py-2.5 text-center">
             <Link
-              href="/dashboard/requester/notifications"
+              href={viewAllHref}
               onClick={() => setOpen(false)}
               className="inline-flex w-full items-center justify-center rounded-lg py-1.5 text-xs font-semibold text-[#174D32] transition-colors hover:bg-[#E6EFE8] hover:text-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45]"
             >

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -32,13 +33,28 @@ export function HeroSection() {
     <section
       id="top"
       aria-labelledby="hero-heading"
-      className="relative overflow-hidden border-b border-slate-200/80 bg-[#F5F5EF] py-16 sm:py-20 lg:py-24"
+      className="relative overflow-hidden border-b border-slate-200/80 bg-[#174D32] py-16 sm:py-20 lg:py-24"
     >
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      {/* Campus Background Image */}
+      <Image
+        src="/images/dnsc-hero-bg.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover object-center"
+      />
+      {/* DNSC Forest Green Gradient Overlay for crisp text contrast */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-r from-[#174D32]/90 via-[#174D32]/75 to-[#25352B]/60"
+      />
+
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
           {/* Left column: headline, copy, CTAs */}
           <div className="lg:col-span-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#174D32]/20 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#25352B] shadow-2xs">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-[#25352B] shadow-xs backdrop-blur-xs">
               <GraduationCap
                 className="h-4 w-4 text-[#174D32]"
                 aria-hidden="true"
@@ -48,12 +64,12 @@ export function HeroSection() {
 
             <h1
               id="hero-heading"
-              className="mt-6 text-3xl font-extrabold tracking-tight text-[#25352B] sm:text-4xl lg:text-5xl lg:leading-[1.12]"
+              className="mt-6 text-3xl font-extrabold tracking-tight text-white drop-shadow-xs sm:text-4xl lg:text-5xl lg:leading-[1.12]"
             >
               Your school documents, made easier.
             </h1>
 
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-[#E6EFE8] sm:text-lg">
               Request academic documents, review requirements, and keep track of
               your requests&mdash;all in one convenient portal.
             </p>
@@ -61,7 +77,7 @@ export function HeroSection() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link
                 href="/register"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#174D32] px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45] focus-visible:ring-offset-2 sm:text-base"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-3.5 text-sm font-semibold text-[#174D32] shadow-sm transition-colors hover:bg-[#E6EFE8] focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#174D32] sm:text-base"
               >
                 <span>Request a Document</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -69,14 +85,14 @@ export function HeroSection() {
 
               <a
                 href="#tracking-info"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-[#25352B] shadow-2xs transition-colors hover:border-[#174D32] hover:bg-[#E6EFE8]/60 hover:text-[#174D32] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45] focus-visible:ring-offset-2 sm:text-base"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/40 bg-[#174D32]/55 px-6 py-3.5 text-sm font-semibold text-white shadow-2xs backdrop-blur-xs transition-colors hover:border-white hover:bg-[#246B45]/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#174D32] sm:text-base"
               >
-                <SearchCheck className="h-4 w-4 text-[#174D32]" aria-hidden="true" />
+                <SearchCheck className="h-4 w-4 text-[#E6EFE8]" aria-hidden="true" />
                 <span>Track a Request</span>
               </a>
             </div>
 
-            <p className="mt-4 text-xs leading-relaxed text-slate-500">
+            <p className="mt-4 text-xs leading-relaxed text-white/80">
               Note: Account registration, online request submission, and live
               request tracking are scheduled for upcoming development
               milestones.
@@ -87,7 +103,7 @@ export function HeroSection() {
           <div className="lg:col-span-6">
             <div
               aria-label="Illustrative preview of the planned RegistrarDocs AI portal interface"
-              className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-md sm:p-6"
+              className="rounded-2xl border border-white/30 bg-white/95 p-5 shadow-xl backdrop-blur-xs sm:p-6"
             >
               {/* Mock window header */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">

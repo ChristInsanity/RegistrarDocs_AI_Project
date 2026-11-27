@@ -168,6 +168,7 @@ export async function PATCH(
   try {
     const result = await resubmitCorrectedDocumentRequest({
       requesterId: auth.user.id,
+      requesterName: auth.user.fullName,
       requestId: id,
       purpose,
       copies: copiesRaw,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, ClipboardList, Eye } from "lucide-react";
 import { RequestStatusBadge } from "@/components/requester/RequestStatusBadge";
 import { StaffRequestDetailsModal } from "@/components/staff/StaffRequestDetailsModal";
@@ -23,12 +24,22 @@ function formatDate(iso: string): string {
 }
 
 export function StaffRecentAttentionSection({
-  requests,
+  requests: initialRequests,
   error,
 }: StaffRecentAttentionSectionProps) {
+  const router = useRouter();
+  const [requests, setRequests] =
+    useState<StaffRequestRecord[]>(initialRequests);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
     null
   );
+
+  const handleRequestUpdated = (updated: StaffRequestRecord) => {
+    setRequests((prev) =>
+      prev.map((item) => (item.id === updated.id ? updated : item))
+    );
+    router.refresh();
+  };
 
   return (
     <section
@@ -44,8 +55,8 @@ export function StaffRecentAttentionSection({
             Recent Requests Requiring Attention
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Latest submitted document requests awaiting review or ongoing
-            attention (read-only overview).
+            Latest submitted document requests awaiting review, preparation, or
+            release.
           </p>
         </div>
 
@@ -190,6 +201,7 @@ export function StaffRecentAttentionSection({
         <StaffRequestDetailsModal
           requestId={selectedRequestId}
           onClose={() => setSelectedRequestId(null)}
+          onRequestUpdated={handleRequestUpdated}
         />
       )}
     </section>

@@ -20,6 +20,11 @@ export interface DocumentRequestRow {
   idempotency_key: string | null;
   submitted_at: string;
   updated_at: string;
+  requester_remarks?: string | null;
+  is_resubmitted?: boolean | null;
+  collection_instructions?: string | null;
+  ready_for_release_at?: string | null;
+  released_at?: string | null;
 }
 
 export interface RequesterDocumentRequestDetail
@@ -28,6 +33,11 @@ export interface RequesterDocumentRequestDetail
   purpose: string;
   copies: number;
   additionalNotes: string | null;
+  requesterRemarks: string | null;
+  isResubmitted: boolean;
+  collectionInstructions: string | null;
+  readyForReleaseAt: string | null;
+  releasedAt: string | null;
   updatedAt: string;
 }
 
@@ -42,6 +52,11 @@ function toRequestDetail(
     purpose: row.purpose,
     copies: row.copies,
     additionalNotes: row.additional_notes,
+    requesterRemarks: row.requester_remarks ?? null,
+    isResubmitted: Boolean(row.is_resubmitted),
+    collectionInstructions: row.collection_instructions ?? null,
+    readyForReleaseAt: row.ready_for_release_at ?? null,
+    releasedAt: row.released_at ?? null,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,
     status: row.status,
@@ -230,6 +245,7 @@ export async function getRequesterDocumentRequestById(
 
 export interface ResubmitCorrectionInput {
   requesterId: string;
+  requesterName?: string;
   requestId: string;
   purpose: string;
   copies: number;
@@ -239,8 +255,8 @@ export interface ResubmitCorrectionInput {
 /**
  * Safely updates an existing requester-owned request ONLY when its current
  * server-side status is `needs_correction`. Preserves the original request ID
- * and reference_number, and transitions status back to `pending` for Registrar
- * Staff re-review.
+ * and reference_number, marks `is_resubmitted = true`, transitions status back
+ * to `pending` for Registrar Staff re-review, and appends a history event.
  */
 export async function resubmitCorrectedDocumentRequest(
   input: ResubmitCorrectionInput
@@ -262,13 +278,14 @@ export async function resubmitCorrectedDocumentRequest(
   }
 
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("document_requests")
     .update({
       purpose: input.purpose.trim(),
       copies: input.copies,
       additional_notes: input.additionalNotes?.trim() || null,
       status: "pending",
+      is_resubmitted: true,
     })
     .eq("id", input.requestId)
     .eq("requester_id", input.requesterId)
@@ -276,8 +293,54 @@ export async function resubmitCorrectedDocumentRequest(
     .select("*")
     .maybeSingle();
 
+  // Graceful fallback if migration 0003 (is_resubmitted) has not yet been applied
+  if (error && isMissingTableError(error.message)) {
+    const fallback = await admin
+      .from("document_requests")
+      .update({
+        purpose: input.purpose.trim(),
+        copies: input.copies,
+        additional_notes: input.additionalNotes?.trim() || null,
+        status: "pending",
+      })
+      .eq("id", input.requestId)
+      .eq("requester_id", input.requesterId)
+      .eq("status", "needs_correction")
+      .select("*")
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error || !data) {
     return { ok: false, reason: "not_editable" };
+  }
+
+  // Record real requester resubmission event in request_status_history if table exists
+  const historyInsert = await admin.from("request_status_history").insert({
+    request_id: input.requestId,
+    from_status: "needs_correction",
+    to_status: "pending",
+    actor_id: input.requesterId,
+    actor_role: "requester",
+    actor_name: input.requesterName?.trim() || "Requester",
+    action_type: "requester_resubmitted",
+    stage: "needs_correction",
+    requester_remarks: "Corrected request details resubmitted for review.",
+    internal_notes: null,
+  });
+
+  if (historyInsert.error && isMissingTableError(historyInsert.error.message)) {
+    await admin.from("request_status_history").insert({
+      request_id: input.requestId,
+      from_status: "needs_correction",
+      to_status: "pending",
+      actor_id: input.requesterId,
+      actor_role: "requester",
+      actor_name: input.requesterName?.trim() || "Requester",
+      requester_remarks: "Corrected request details resubmitted for review.",
+      internal_notes: null,
+    });
   }
 
   return {

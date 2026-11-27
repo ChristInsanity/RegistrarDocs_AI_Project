@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { HelpCircle } from "lucide-react";
-import { FAQ_ITEMS } from "@/lib/landing-data";
+import { listPublishedFaqsForRequester } from "@/lib/db/admin-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,9 @@ export const metadata: Metadata = {
     "Frequently asked questions and guidance for DNSC RegistrarDocs AI requesters.",
 };
 
-export default function RequesterHelpPage() {
+export default async function RequesterHelpPage() {
+  const faqs = await listPublishedFaqsForRequester();
+
   return (
     <div className="space-y-5">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs sm:p-8">
@@ -29,12 +31,12 @@ export default function RequesterHelpPage() {
         </p>
 
         <dl className="mt-6 divide-y divide-slate-200 rounded-xl border border-slate-200">
-          {FAQ_ITEMS.map((item) => (
+          {faqs.map((item) => (
             <div key={item.id} className="p-4 sm:p-5">
               <dt className="text-sm font-bold text-[#25352B]">
                 {item.question}
               </dt>
-              <dd className="mt-1.5 text-xs leading-relaxed text-slate-600 sm:text-sm">
+              <dd className="mt-1.5 whitespace-pre-line text-xs leading-relaxed text-slate-600 sm:text-sm">
                 {item.answer}
               </dd>
             </div>

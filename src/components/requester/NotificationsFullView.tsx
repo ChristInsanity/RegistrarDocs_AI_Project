@@ -19,7 +19,17 @@ import type { PersistedNotification } from "@/lib/db/notifications";
 
 const PAGE_SIZE = 15;
 
-export function NotificationsFullView() {
+interface NotificationsFullViewProps {
+  apiEndpoint?: string;
+  requestsHref?: string;
+  showRequestDocumentCta?: boolean;
+}
+
+export function NotificationsFullView({
+  apiEndpoint = "/api/requester/notifications",
+  requestsHref = "/dashboard/requester/requests",
+  showRequestDocumentCta = true,
+}: NotificationsFullViewProps = {}) {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [notifications, setNotifications] = useState<PersistedNotification[]>(
     []
@@ -45,10 +55,9 @@ export function NotificationsFullView() {
         });
         if (unreadOnly) params.set("unreadOnly", "true");
 
-        const res = await fetch(
-          `/api/requester/notifications?${params.toString()}`,
-          { cache: "no-store" }
-        );
+        const res = await fetch(`${apiEndpoint}?${params.toString()}`, {
+          cache: "no-store",
+        });
         if (!res.ok) {
           setError("Unable to load notifications right now. Please try again.");
           return;
@@ -73,7 +82,7 @@ export function NotificationsFullView() {
         setLoadingMore(false);
       }
     },
-    []
+    [apiEndpoint]
   );
 
   useEffect(() => {
@@ -87,10 +96,9 @@ export function NotificationsFullView() {
         });
         if (filter === "unread") params.set("unreadOnly", "true");
 
-        const res = await fetch(
-          `/api/requester/notifications?${params.toString()}`,
-          { cache: "no-store" }
-        );
+        const res = await fetch(`${apiEndpoint}?${params.toString()}`, {
+          cache: "no-store",
+        });
         if (cancelled) return;
         if (!res.ok) {
           setError("Unable to load notifications right now. Please try again.");
@@ -122,7 +130,7 @@ export function NotificationsFullView() {
     return () => {
       cancelled = true;
     };
-  }, [filter]);
+  }, [apiEndpoint, filter]);
 
   const handleMarkRead = async (id: string) => {
     setNotifications((prev) =>
@@ -133,7 +141,7 @@ export function NotificationsFullView() {
     setUnreadCount((prev) => Math.max(0, prev - 1));
 
     try {
-      const res = await fetch("/api/requester/notifications", {
+      const res = await fetch(apiEndpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_read", notificationId: id }),
@@ -154,7 +162,7 @@ export function NotificationsFullView() {
     if (markingAll || unreadCount === 0) return;
     setMarkingAll(true);
     try {
-      const res = await fetch("/api/requester/notifications", {
+      const res = await fetch(apiEndpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_all_read" }),
@@ -277,7 +285,7 @@ export function NotificationsFullView() {
                 ? "You have read all of your notifications."
                 : "Notifications are created automatically when you submit a document request or when Registrar Staff update your request status."}
             </p>
-            {filter === "all" && (
+            {filter === "all" && showRequestDocumentCta && (
               <div className="mt-5">
                 <Link
                   href="/dashboard/requester/request"
@@ -352,7 +360,7 @@ export function NotificationsFullView() {
                     )}
                     {item.requestReference && (
                       <Link
-                        href={`/dashboard/requester/requests?ref=${encodeURIComponent(item.requestReference)}`}
+                        href={`${requestsHref}?ref=${encodeURIComponent(item.requestReference)}`}
                         onClick={() => {
                           if (!item.read) void handleMarkRead(item.id);
                         }}

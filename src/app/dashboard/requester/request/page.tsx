@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DocumentCatalogAndRequestFlow } from "@/components/requester/DocumentCatalogAndRequestFlow";
 import { requirePageRole } from "@/lib/auth/rbac";
+import { listActiveCatalogForRequester } from "@/lib/db/admin-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -12,5 +13,6 @@ export const metadata: Metadata = {
 
 export default async function RequestDocumentPage() {
   const user = await requirePageRole("requester");
-  return <DocumentCatalogAndRequestFlow user={user} />;
+  const catalog = await listActiveCatalogForRequester();
+  return <DocumentCatalogAndRequestFlow user={user} catalog={catalog} />;
 }

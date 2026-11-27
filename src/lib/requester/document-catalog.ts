@@ -1,4 +1,4 @@
-export type DocumentTypeCode = "tor" | "coe" | "diploma" | "other";
+export type DocumentTypeCode = string;
 
 export interface DocumentCatalogItem {
   code: DocumentTypeCode;

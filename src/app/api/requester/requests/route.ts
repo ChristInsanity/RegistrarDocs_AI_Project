@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/auth/rbac";
 import { createNotification } from "@/lib/db/notifications";
+import { listActiveCatalogForRequester } from "@/lib/db/admin-catalog";
 import {
   createDocumentRequest,
   listRequesterDocumentRequests,
 } from "@/lib/db/requests";
-import { getDocumentCatalogItem } from "@/lib/requester/document-catalog";
 import type { AuthErrorCode } from "@/types/auth";
 
 export async function GET() {
@@ -66,11 +66,13 @@ export async function POST(request: Request) {
       ? body.idempotencyKey.trim().slice(0, 100)
       : null;
 
-  const catalogItem = getDocumentCatalogItem(documentTypeCode);
+  const activeCatalog = await listActiveCatalogForRequester();
+  const catalogItem = activeCatalog.find((c) => c.code === documentTypeCode);
   const fieldErrors: Record<string, string> = {};
 
   if (!catalogItem) {
-    fieldErrors.documentTypeCode = "Please select a valid document type.";
+    fieldErrors.documentTypeCode =
+      "Please select a currently available document type.";
   }
 
   if (!purpose) {

@@ -325,7 +325,14 @@ export function RequestDetailsModal({
                       <h3 className="text-sm font-bold text-orange-950">
                         Correction Required Before Processing
                       </h3>
-                      {correctionNotices.length > 0 ? (
+                      {request.requesterRemarks ? (
+                        <p className="mt-1.5 rounded-lg border border-orange-200 bg-white/80 p-2.5 text-xs leading-relaxed text-orange-950">
+                          <strong className="font-semibold">
+                            Registrar Staff Instructions:
+                          </strong>{" "}
+                          {request.requesterRemarks}
+                        </p>
+                      ) : correctionNotices.length > 0 ? (
                         <ul className="mt-2 space-y-1.5 text-xs text-orange-900">
                           {correctionNotices.map((notice) => (
                             <li key={notice.id}>{notice.message}</li>
@@ -470,17 +477,62 @@ export function RequestDetailsModal({
                 </div>
               )}
 
-              {/* Collection Instructions (only if recorded) */}
-              {collectionNotices.length > 0 && (
-                <div className="rounded-xl border border-[#174D32]/25 bg-[#E6EFE8]/60 p-4">
-                  <h3 className="text-xs font-bold tracking-wider text-[#174D32] uppercase">
-                    Collection &amp; Release Instructions
-                  </h3>
-                  <ul className="mt-2 space-y-1.5 text-xs text-[#25352B]">
-                    {collectionNotices.map((notice) => (
-                      <li key={notice.id}>{notice.message}</li>
-                    ))}
-                  </ul>
+              {/* Rejection Reason (only if status === "rejected" and remarks recorded) */}
+              {request.status === "rejected" && request.requesterRemarks && (
+                <div className="rounded-xl border border-red-200 bg-red-50/80 p-4 text-xs text-red-900">
+                  <p className="font-bold text-red-950">
+                    Registrar Staff Remarks
+                  </p>
+                  <p className="mt-1 leading-relaxed">
+                    {request.requesterRemarks}
+                  </p>
+                </div>
+              )}
+
+              {/* Collection Instructions (when Ready for Release or recorded) */}
+              {(request.collectionInstructions ||
+                collectionNotices.length > 0) &&
+                request.status !== "released" && (
+                  <div className="rounded-xl border border-[#174D32]/25 bg-[#E6EFE8]/60 p-4">
+                    <h3 className="text-xs font-bold tracking-wider text-[#174D32] uppercase">
+                      Collection &amp; Release Instructions
+                    </h3>
+                    {request.collectionInstructions ? (
+                      <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-[#25352B]">
+                        {request.collectionInstructions}
+                      </p>
+                    ) : (
+                      <ul className="mt-2 space-y-1.5 text-xs text-[#25352B]">
+                        {collectionNotices.map((notice) => (
+                          <li key={notice.id}>{notice.message}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {request.readyForReleaseAt && (
+                      <p className="mt-2 text-[11px] text-slate-600">
+                        Marked Ready for Release on{" "}
+                        {formatFullDateTime(request.readyForReleaseAt)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+              {/* Released Confirmation Banner */}
+              {request.status === "released" && (
+                <div className="rounded-xl border border-[#246B45]/30 bg-[#E6EFE8]/75 p-4">
+                  <div className="flex items-start gap-2.5">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#174D32]" />
+                    <div className="min-w-0 text-xs text-[#25352B]">
+                      <p className="font-bold text-[#174D32]">
+                        Document Officially Released
+                      </p>
+                      <p className="mt-1 leading-relaxed">
+                        {request.releasedAt
+                          ? `This document request was verified and released by the DNSC Registrar's Office on ${formatFullDateTime(request.releasedAt)}.`
+                          : "This document request has been officially released by the DNSC Registrar's Office."}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 

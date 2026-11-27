@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   Archive,
@@ -16,6 +16,7 @@ import {
   User,
   X,
 } from "lucide-react";
+import { NotificationQuickPanel } from "@/components/requester/NotificationQuickPanel";
 import { BrandMark } from "@/components/ui/BrandMark";
 import type { SafeUser } from "@/types/auth";
 
@@ -39,21 +40,36 @@ const MAIN_NAV_ITEMS = [
   },
 ] as const;
 
-const WORKFLOW_COMING_SOON_ITEMS = [
-  { label: "Processing", icon: LoaderCircle },
-  { label: "Needs Correction", icon: AlertTriangle },
-  { label: "Ready for Release", icon: PackageCheck },
-  { label: "Release Records", icon: Archive },
-] as const;
-
-const ACCOUNT_NAV_ITEMS = [
+const ACTIVE_WORKFLOW_ITEMS = [
   {
-    label: "My Profile",
-    href: "/dashboard/staff/profile",
-    icon: User,
-    exact: false,
+    label: "Processing",
+    href: "/dashboard/staff/queue?status=processing",
+    statusKey: "processing",
+    icon: LoaderCircle,
+  },
+  {
+    label: "Needs Correction",
+    href: "/dashboard/staff/queue?status=needs_correction",
+    statusKey: "needs_correction",
+    icon: AlertTriangle,
+  },
+  {
+    label: "Ready for Release",
+    href: "/dashboard/staff/queue?status=ready_for_release",
+    statusKey: "ready_for_release",
+    icon: PackageCheck,
+  },
+  {
+    label: "Release Records",
+    href: "/dashboard/staff/queue?status=released",
+    statusKey: "released",
+    icon: Archive,
   },
 ] as const;
+
+const WORKFLOW_STATUS_KEYS = new Set<string>(
+  ACTIVE_WORKFLOW_ITEMS.map((item) => item.statusKey)
+);
 
 function getInitials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -64,11 +80,13 @@ function getInitials(fullName: string): string {
 
 export function StaffShell({ user, children }: StaffShellProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const activeStatusParam = searchParams.get("status");
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -99,10 +117,19 @@ export function StaffShell({ user, children }: StaffShellProps) {
     };
   }, [mobileNavOpen, accountMenuOpen]);
 
-  const isActive = (href: string, exact: boolean) => {
+  const isMainNavActive = (href: string, exact: boolean) => {
+    if (href === "/dashboard/staff/queue") {
+      return (
+        pathname === "/dashboard/staff/queue" &&
+        (!activeStatusParam || !WORKFLOW_STATUS_KEYS.has(activeStatusParam))
+      );
+    }
     if (exact) return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
+
+  const isWorkflowItemActive = (statusKey: string) =>
+    pathname === "/dashboard/staff/queue" && activeStatusParam === statusKey;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -130,7 +157,7 @@ export function StaffShell({ user, children }: StaffShellProps) {
         <ul className="space-y-1.5">
           {MAIN_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
-            const active = isActive(item.href, item.exact);
+            const active = isMainNavActive(item.href, item.exact);
             return (
               <li key={item.href}>
                 <Link
@@ -159,46 +186,17 @@ export function StaffShell({ user, children }: StaffShellProps) {
         </ul>
       </div>
 
-      {/* Request Workflow (Upcoming Milestones — Disabled / Coming Soon) */}
+      {/* Request Workflow */}
       <div>
         <p className="mb-2.5 px-3 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
           Request Workflow
         </p>
         <ul className="space-y-1">
-          {WORKFLOW_COMING_SOON_ITEMS.map((item) => {
+          {ACTIVE_WORKFLOW_ITEMS.map((item) => {
             const Icon = item.icon;
+            const active = isWorkflowItemActive(item.statusKey);
             return (
               <li key={item.label}>
-                <span
-                  aria-disabled="true"
-                  title="Coming in an upcoming Staff processing milestone"
-                  className="flex cursor-not-allowed items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-400 select-none"
-                >
-                  <span className="flex min-w-0 items-center gap-3">
-                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span className="truncate">{item.label}</span>
-                  </span>
-                  <span className="shrink-0 rounded-full border border-slate-200 bg-[#F5F5EF] px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                    Soon
-                  </span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      {/* Account */}
-      <div>
-        <p className="mb-2.5 px-3 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-          Account
-        </p>
-        <ul className="space-y-1.5">
-          {ACCOUNT_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href, item.exact);
-            return (
-              <li key={item.href}>
                 <Link
                   href={item.href}
                   onClick={onSelect}
@@ -222,17 +220,6 @@ export function StaffShell({ user, children }: StaffShellProps) {
               </li>
             );
           })}
-          <li>
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45] disabled:opacity-60"
-            >
-              <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{isLoggingOut ? "Logging Out..." : "Logout"}</span>
-            </button>
-          </li>
         </ul>
       </div>
     </div>
@@ -323,19 +310,21 @@ export function StaffShell({ user, children }: StaffShellProps) {
                 DNSC Registrar&apos;s Office — Staff Workspace
               </p>
               <p className="hidden text-xs text-slate-500 sm:block">
-                RegistrarDocs AI &middot; Document Request Queue Foundation
+                RegistrarDocs AI &middot; Document Review, Preparation &amp;
+                Release
               </p>
             </div>
           </div>
 
-          {/* Staff Profile Dropdown */}
-          <div
-            ref={accountMenuRef}
-            className="relative flex shrink-0 items-center gap-2.5"
-          >
-            <span className="hidden rounded-full border border-[#246B45]/25 bg-[#E6EFE8] px-3 py-1 text-xs font-semibold text-[#174D32] md:inline-flex">
-              Registrar Staff
-            </span>
+          {/* Notifications Quick Panel + Staff Profile Dropdown */}
+          <div className="flex shrink-0 items-center gap-2">
+            <NotificationQuickPanel
+              apiEndpoint="/api/staff/notifications"
+              viewAllHref="/dashboard/staff/notifications"
+              requestsHref="/dashboard/staff/queue"
+            />
+
+            <div ref={accountMenuRef} className="relative flex items-center">
 
             <button
               type="button"
@@ -408,6 +397,7 @@ export function StaffShell({ user, children }: StaffShellProps) {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </header>
 
