@@ -3,6 +3,10 @@ import { requireApiAuth } from "@/lib/auth/rbac";
 import { createNotification } from "@/lib/db/notifications";
 import { listActiveCatalogForRequester } from "@/lib/db/admin-catalog";
 import {
+  hasCompleteAcademicProfile,
+  requiresAcademicProfileForDocument,
+} from "@/lib/dnsc/academic-programs";
+import {
   createDocumentRequest,
   listRequesterDocumentRequests,
 } from "@/lib/db/requests";
@@ -104,6 +108,21 @@ export async function POST(request: Request) {
     );
   }
 
+  // Enforce verified Institute & Program from requester's profile for applicable document types
+  if (
+    requiresAcademicProfileForDocument(catalogItem.code) &&
+    !hasCompleteAcademicProfile(auth.user)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Your Institute and Program are required for this document request. Please update your academic information in your profile before continuing.",
+        code: "ACADEMIC_PROFILE_INCOMPLETE" satisfies AuthErrorCode,
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const { request: persisted, wasDuplicate } = await createDocumentRequest({
       requesterId: auth.user.id,
@@ -113,6 +132,8 @@ export async function POST(request: Request) {
       copies: copiesRaw,
       additionalNotes: additionalNotes || null,
       idempotencyKey,
+      requesterInstitute: auth.user.institute,
+      requesterProgram: auth.user.program,
     });
 
     // Only create an in-app notification on a newly persisted request (never on duplicates or failures)

@@ -18,6 +18,8 @@ export interface AdminUserRecord {
   email: string;
   studentId: string | null;
   employeeId: string | null;
+  institute: string | null;
+  program: string | null;
   role: UserRole;
   status: AccountStatus;
   hasStudentIdImage: boolean;
@@ -36,6 +38,8 @@ interface RawAdminProfileRow {
   email: string;
   student_id: string | null;
   employee_id: string | null;
+  institute?: string | null;
+  program?: string | null;
   role: UserRole;
   status: AccountStatus;
   student_id_image_path: string | null;
@@ -55,6 +59,8 @@ function mapAdminUserRow(row: RawAdminProfileRow): AdminUserRecord {
     email: row.email,
     studentId: row.student_id,
     employeeId: row.employee_id,
+    institute: row.institute ?? null,
+    program: row.program ?? null,
     role: row.role,
     status: row.status,
     hasStudentIdImage: Boolean(row.student_id_image_path),
@@ -79,7 +85,7 @@ function isMissingColumn(message: string | undefined): boolean {
 }
 
 const FULL_PROFILE_SELECT =
-  "id, full_name, email, student_id, employee_id, role, status, student_id_image_path, student_id_image_mime, student_id_image_size, approval_remarks, reviewed_at, created_at, updated_at, last_login_at";
+  "id, full_name, email, student_id, employee_id, institute, program, role, status, student_id_image_path, student_id_image_mime, student_id_image_size, approval_remarks, reviewed_at, created_at, updated_at, last_login_at";
 const BASE_PROFILE_SELECT =
   "id, full_name, email, student_id, employee_id, role, status, student_id_image_path, student_id_image_mime, student_id_image_size, created_at, updated_at, last_login_at";
 

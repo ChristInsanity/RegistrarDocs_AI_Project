@@ -574,6 +574,22 @@ export function RequestDetailsModal({
                       {request.purpose}
                     </dd>
                   </div>
+                  {request.requesterInstitute && (
+                    <div>
+                      <dt className="font-semibold text-slate-500">Institute</dt>
+                      <dd className="mt-0.5 font-medium text-[#25352B]">
+                        {request.requesterInstitute}
+                      </dd>
+                    </div>
+                  )}
+                  {request.requesterProgram && (
+                    <div>
+                      <dt className="font-semibold text-slate-500">Program</dt>
+                      <dd className="mt-0.5 font-medium text-[#25352B]">
+                        {request.requesterProgram}
+                      </dd>
+                    </div>
+                  )}
                   {request.additionalNotes && (
                     <div className="sm:col-span-2">
                       <dt className="font-semibold text-slate-500">

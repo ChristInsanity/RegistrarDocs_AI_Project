@@ -378,6 +378,24 @@ export function AdminUsersManager({
                     {selectedUser.status.replace(/_/g, " ")}
                   </dd>
                 </div>
+                {selectedUser.role === "requester" && (
+                  <>
+                    <div>
+                      <dt className="font-semibold text-slate-500">
+                        Institute
+                      </dt>
+                      <dd className="mt-0.5 font-medium text-[#25352B]">
+                        {selectedUser.institute || "Not provided"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-500">Program</dt>
+                      <dd className="mt-0.5 font-medium text-[#25352B]">
+                        {selectedUser.program || "Not provided"}
+                      </dd>
+                    </div>
+                  </>
+                )}
                 <div>
                   <dt className="font-semibold text-slate-500">
                     {selectedUser.role === "requester"

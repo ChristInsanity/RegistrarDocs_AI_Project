@@ -27,6 +27,8 @@ export interface StaffRequestRecord {
   requesterName: string;
   requesterStudentId: string | null;
   requesterEmail: string;
+  requesterInstitute: string | null;
+  requesterProgram: string | null;
   assignedStaffId: string | null;
   requesterRemarks: string | null;
   internalStaffNotes: string | null;
@@ -108,16 +110,22 @@ interface RawStaffRequestRow {
   collector_name?: string | null;
   release_remarks?: string | null;
   released_at?: string | null;
+  requester_institute?: string | null;
+  requester_program?: string | null;
   profiles:
     | {
         full_name: string;
         student_id: string | null;
         email: string;
+        institute?: string | null;
+        program?: string | null;
       }
     | {
         full_name: string;
         student_id: string | null;
         email: string;
+        institute?: string | null;
+        program?: string | null;
       }[]
     | null;
 }
@@ -142,6 +150,8 @@ function mapStaffRow(row: RawStaffRequestRow): StaffRequestRecord {
     requesterName: profile?.full_name ?? "Unknown Requester",
     requesterStudentId: profile?.student_id ?? null,
     requesterEmail: profile?.email ?? "",
+    requesterInstitute: row.requester_institute ?? profile?.institute ?? null,
+    requesterProgram: row.requester_program ?? profile?.program ?? null,
     assignedStaffId: row.assigned_staff_id ?? null,
     requesterRemarks: row.requester_remarks ?? null,
     internalStaffNotes: row.internal_staff_notes ?? null,
@@ -230,10 +240,14 @@ const FULL_STAFF_SELECT = `
   collector_name,
   release_remarks,
   released_at,
+  requester_institute,
+  requester_program,
   profiles:requester_id (
     full_name,
     student_id,
-    email
+    email,
+    institute,
+    program
   )
 `;
 

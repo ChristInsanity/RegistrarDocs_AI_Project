@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { DocumentCatalogAndRequestFlow } from "@/components/requester/DocumentCatalogAndRequestFlow";
 import { requirePageRole } from "@/lib/auth/rbac";
@@ -14,5 +15,9 @@ export const metadata: Metadata = {
 export default async function RequestDocumentPage() {
   const user = await requirePageRole("requester");
   const catalog = await listActiveCatalogForRequester();
-  return <DocumentCatalogAndRequestFlow user={user} catalog={catalog} />;
+  return (
+    <Suspense fallback={null}>
+      <DocumentCatalogAndRequestFlow user={user} catalog={catalog} />
+    </Suspense>
+  );
 }

@@ -1,4 +1,8 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  findDnscInstitute,
+  isValidInstituteProgramPair,
+} from "@/lib/dnsc/academic-programs";
 import type { AccountStatus, SafeUser, UserRole } from "@/types/auth";
 
 export interface ProfileRow {
@@ -7,6 +11,8 @@ export interface ProfileRow {
   email: string;
   student_id: string | null;
   employee_id: string | null;
+  institute?: string | null;
+  program?: string | null;
   role: UserRole;
   status: AccountStatus;
   student_id_image_path: string | null;
@@ -25,6 +31,8 @@ export function toSafeUser(row: ProfileRow): SafeUser {
     email: row.email,
     studentId: row.student_id,
     employeeId: row.employee_id,
+    institute: row.institute ?? null,
+    program: row.program ?? null,
     role: row.role,
     status: row.status,
     mustChangePassword: Boolean(row.must_change_password),
@@ -186,4 +194,84 @@ export async function updateProfileLastLogin(userId: string): Promise<void> {
     .from("profiles")
     .update({ last_login_at: new Date().toISOString() })
     .eq("id", userId);
+}
+
+export async function updateRequesterAcademicProfile(
+  userId: string,
+  institute: string,
+  program: string
+): Promise<
+  | { ok: true; user: SafeUser }
+  | {
+      ok: false;
+      error: string;
+      status: number;
+      fieldErrors?: Record<string, string>;
+    }
+> {
+  const trimmedInstitute = institute.trim();
+  const trimmedProgram = program.trim();
+  const fieldErrors: Record<string, string> = {};
+
+  if (!trimmedInstitute) {
+    fieldErrors.institute = "Please select your DNSC Institute.";
+  } else if (!findDnscInstitute(trimmedInstitute)) {
+    fieldErrors.institute =
+      "Selected Institute is not a valid DNSC Institute.";
+  }
+
+  if (!trimmedProgram) {
+    fieldErrors.program = "Please select your academic Program.";
+  } else if (
+    trimmedInstitute &&
+    findDnscInstitute(trimmedInstitute) &&
+    !isValidInstituteProgramPair(trimmedInstitute, trimmedProgram)
+  ) {
+    fieldErrors.program =
+      "Selected Program does not belong to the chosen DNSC Institute.";
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return {
+      ok: false,
+      error: "Please select a valid DNSC Institute and matching Program.",
+      status: 400,
+      fieldErrors,
+    };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .update({
+      institute: trimmedInstitute,
+      program: trimmedProgram,
+    })
+    .eq("id", userId)
+    .eq("role", "requester")
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    const msg = (error?.message ?? "").toLowerCase();
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("could not find") ||
+      msg.includes("schema cache")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Academic profile columns are not yet created in Supabase. Please run migration 0009_requester_academic_profile.sql.",
+        status: 503,
+      };
+    }
+    return {
+      ok: false,
+      error: error?.message || "Unable to save academic profile right now.",
+      status: 500,
+    };
+  }
+
+  return { ok: true, user: toSafeUser(data as ProfileRow) };
 }

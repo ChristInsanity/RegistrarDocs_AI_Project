@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
@@ -20,6 +22,10 @@ import {
 } from "lucide-react";
 import { dispatchNotificationsUpdated } from "@/components/requester/NotificationQuickPanel";
 import type { RequesterDocumentRequestDetail } from "@/lib/db/requests";
+import {
+  hasCompleteAcademicProfile,
+  requiresAcademicProfileForDocument,
+} from "@/lib/dnsc/academic-programs";
 import {
   DOCUMENT_CATALOG,
   type DocumentCatalogItem,
@@ -66,10 +72,26 @@ export function DocumentCatalogAndRequestFlow({
   user,
   catalog = DOCUMENT_CATALOG,
 }: DocumentCatalogAndRequestFlowProps) {
+  const searchParams = useSearchParams();
+  const initialDocCode = searchParams.get("doc");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDoc, setSelectedDoc] = useState<DocumentCatalogItem | null>(
-    null
+    () =>
+      initialDocCode
+        ? (catalog.find((item) => item.code === initialDocCode) ?? null)
+        : null
   );
+
+  // Live academic profile (refreshed from /api/requester/profile so updates take effect without re-login)
+  const [profileAcademic, setProfileAcademic] = useState<{
+    institute: string | null;
+    program: string | null;
+  }>({
+    institute: user.institute ?? null,
+    program: user.program ?? null,
+  });
+  const [profileReminderOpen, setProfileReminderOpen] = useState(false);
 
   // Modal & Form state (preserved while viewing the same document so closing doesn't lose draft input)
   const [requestModalOpen, setRequestModalOpen] = useState(false);
@@ -77,12 +99,44 @@ export function DocumentCatalogAndRequestFlow({
   const [purpose, setPurpose] = useState("");
   const [copies, setCopies] = useState(1);
   const [additionalNotes, setAdditionalNotes] = useState("");
-  const [idempotencyKey, setIdempotencyKey] = useState<string>("");
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
+    createDraftIdempotencyKey()
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedRequest, setConfirmedRequest] =
     useState<RequesterDocumentRequestDetail | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const refreshProfile = async () => {
+      try {
+        const res = await fetch("/api/requester/profile", {
+          cache: "no-store",
+        });
+        if (!res.ok || !active) return;
+        const data = (await res.json().catch(() => null)) as {
+          profile?: { institute?: string | null; program?: string | null };
+        } | null;
+        if (active && data?.profile) {
+          setProfileAcademic({
+            institute: data.profile.institute ?? null,
+            program: data.profile.program ?? null,
+          });
+        }
+      } catch {
+        // Keep current profile snapshot
+      }
+    };
+    void refreshProfile();
+    const handleFocus = () => void refreshProfile();
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
 
   useEffect(() => {
     if (!requestModalOpen) return;
@@ -132,6 +186,14 @@ export function DocumentCatalogAndRequestFlow({
 
   const handleOpenRequestModal = () => {
     setSubmitError(null);
+    if (
+      selectedDoc &&
+      requiresAcademicProfileForDocument(selectedDoc.code) &&
+      !hasCompleteAcademicProfile(profileAcademic)
+    ) {
+      setProfileReminderOpen(true);
+      return;
+    }
     setModalStep("form");
     setRequestModalOpen(true);
   };
@@ -195,11 +257,18 @@ export function DocumentCatalogAndRequestFlow({
 
       const payload = (await response.json().catch(() => null)) as {
         error?: string;
+        code?: string;
         fieldErrors?: Record<string, string>;
         request?: RequesterDocumentRequestDetail;
       } | null;
 
       if (!response.ok || !payload?.request) {
+        if (payload?.code === "ACADEMIC_PROFILE_INCOMPLETE") {
+          setRequestModalOpen(false);
+          setModalStep("form");
+          setProfileReminderOpen(true);
+          return;
+        }
         setModalStep("form");
         if (payload?.fieldErrors) {
           setFieldErrors(payload.fieldErrors);
@@ -278,6 +347,26 @@ export function DocumentCatalogAndRequestFlow({
                     {confirmedRequest.purpose}
                   </dd>
                 </div>
+                {(confirmedRequest.requesterInstitute ||
+                  profileAcademic.institute) && (
+                  <div>
+                    <dt className="font-semibold text-slate-500">Institute</dt>
+                    <dd className="mt-0.5 font-medium text-[#25352B]">
+                      {confirmedRequest.requesterInstitute ||
+                        profileAcademic.institute}
+                    </dd>
+                  </div>
+                )}
+                {(confirmedRequest.requesterProgram ||
+                  profileAcademic.program) && (
+                  <div>
+                    <dt className="font-semibold text-slate-500">Program</dt>
+                    <dd className="mt-0.5 font-medium text-[#25352B]">
+                      {confirmedRequest.requesterProgram ||
+                        profileAcademic.program}
+                    </dd>
+                  </div>
+                )}
               </dl>
             </div>
 
@@ -469,26 +558,54 @@ export function DocumentCatalogAndRequestFlow({
               {/* Independently Scrollable Modal Body */}
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                 {/* Reused Authenticated Requester Info */}
-                <dl className="grid gap-3 rounded-xl border border-slate-200 bg-[#F5F5EF]/80 p-4 text-xs sm:grid-cols-3">
-                  <div>
-                    <dt className="font-semibold text-slate-500">Full Name</dt>
-                    <dd className="mt-0.5 font-semibold text-[#25352B]">
-                      {user.fullName}
-                    </dd>
+                <div className="rounded-xl border border-slate-200 bg-[#F5F5EF]/80 p-4 text-xs">
+                  <dl className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <dt className="font-semibold text-slate-500">Full Name</dt>
+                      <dd className="mt-0.5 font-semibold text-[#25352B]">
+                        {user.fullName}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-500">Student ID</dt>
+                      <dd className="mt-0.5 font-semibold text-[#25352B]">
+                        {user.studentId ?? "Not set"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-500">DNSC Email</dt>
+                      <dd className="mt-0.5 truncate font-medium text-[#25352B]">
+                        {user.email}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3 border-t border-slate-200/80 pt-3">
+                    <dl className="grid flex-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <dt className="font-semibold text-slate-500">
+                          Institute (from Profile)
+                        </dt>
+                        <dd className="mt-0.5 font-semibold text-[#25352B]">
+                          {profileAcademic.institute || "Not set"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold text-slate-500">
+                          Program (from Profile)
+                        </dt>
+                        <dd className="mt-0.5 font-semibold text-[#25352B]">
+                          {profileAcademic.program || "Not set"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <Link
+                      href={`/dashboard/requester/profile?returnTo=${encodeURIComponent(`/dashboard/requester/request?doc=${selectedDoc.code}`)}#academic-profile`}
+                      className="shrink-0 text-[11px] font-semibold text-[#174D32] underline-offset-2 hover:underline"
+                    >
+                      Update in Profile
+                    </Link>
                   </div>
-                  <div>
-                    <dt className="font-semibold text-slate-500">Student ID</dt>
-                    <dd className="mt-0.5 font-semibold text-[#25352B]">
-                      {user.studentId ?? "Not set"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-semibold text-slate-500">DNSC Email</dt>
-                    <dd className="mt-0.5 truncate font-medium text-[#25352B]">
-                      {user.email}
-                    </dd>
-                  </div>
-                </dl>
+                </div>
 
                 {submitError && (
                   <div
@@ -713,6 +830,26 @@ export function DocumentCatalogAndRequestFlow({
                           {copies}
                         </dd>
                       </div>
+                      {profileAcademic.institute && (
+                        <div className="flex justify-between gap-4 border-t border-slate-200 pt-2.5">
+                          <dt className="font-semibold text-slate-500">
+                            Institute
+                          </dt>
+                          <dd className="text-right font-medium text-[#25352B]">
+                            {profileAcademic.institute}
+                          </dd>
+                        </div>
+                      )}
+                      {profileAcademic.program && (
+                        <div className="flex justify-between gap-4">
+                          <dt className="font-semibold text-slate-500">
+                            Program
+                          </dt>
+                          <dd className="text-right font-medium text-[#25352B]">
+                            {profileAcademic.program}
+                          </dd>
+                        </div>
+                      )}
                       <div className="border-t border-slate-200 pt-2.5">
                         <dt className="font-semibold text-slate-500">Purpose</dt>
                         <dd className="mt-0.5 text-[#25352B]">
@@ -781,6 +918,74 @@ export function DocumentCatalogAndRequestFlow({
                     </button>
                   </>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Missing Academic Profile Reminder Modal */}
+        {profileReminderOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="academic-profile-incomplete-title"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#25352B]/55 p-4 backdrop-blur-xs"
+          >
+            <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                    <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <h2
+                    id="academic-profile-incomplete-title"
+                    className="text-base font-bold text-[#25352B]"
+                  >
+                    Academic Profile Incomplete
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileReminderOpen(false)}
+                  aria-label="Close reminder"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-[#E6EFE8] hover:text-[#174D32]"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div className="px-6 py-5 text-sm leading-relaxed text-slate-600">
+                <p>
+                  Your <strong className="font-semibold text-[#25352B]">Institute</strong>{" "}
+                  and <strong className="font-semibold text-[#25352B]">Program</strong>{" "}
+                  are required for this document request (
+                  <span className="font-semibold text-[#174D32]">
+                    {selectedDoc.name}
+                  </span>
+                  ). Please update your academic information in your profile
+                  before continuing.
+                </p>
+                <p className="mt-2.5 text-xs text-slate-500">
+                  Once saved in your profile, your Institute and Program will be
+                  reused automatically across all applicable document requests.
+                </p>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2.5 border-t border-slate-100 bg-[#F5F5EF]/60 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setProfileReminderOpen(false)}
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#25352B] transition-colors hover:bg-[#F5F5EF]"
+                >
+                  Cancel
+                </button>
+                <Link
+                  href={`/dashboard/requester/profile?returnTo=${encodeURIComponent(`/dashboard/requester/request?doc=${selectedDoc.code}`)}#academic-profile`}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#174D32] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#246B45] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#246B45] focus-visible:ring-offset-2"
+                >
+                  <span>Update My Profile</span>
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
               </div>
             </div>
           </div>

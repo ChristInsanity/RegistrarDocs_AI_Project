@@ -18,6 +18,8 @@ export interface SafeUser {
   email: string;
   studentId: string | null;
   employeeId: string | null;
+  institute: string | null;
+  program: string | null;
   role: UserRole;
   status: AccountStatus;
   mustChangePassword?: boolean;
@@ -29,6 +31,7 @@ export interface SafeUser {
 export type AuthErrorCode =
   | "INVALID_CREDENTIALS"
   | "VALIDATION_ERROR"
+  | "ACADEMIC_PROFILE_INCOMPLETE"
   | "DUPLICATE_EMAIL"
   | "DUPLICATE_STUDENT_ID"
   | "ACCOUNT_PENDING_APPROVAL"

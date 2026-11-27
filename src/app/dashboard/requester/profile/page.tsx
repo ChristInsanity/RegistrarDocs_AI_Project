@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
+import { AcademicProfileForm } from "@/components/requester/AcademicProfileForm";
 import { requirePageRole } from "@/lib/auth/rbac";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +99,13 @@ export default async function RequesterProfilePage() {
           </div>
         </dl>
       </section>
+
+      <Suspense fallback={null}>
+        <AcademicProfileForm
+          initialInstitute={user.institute}
+          initialProgram={user.program}
+        />
+      </Suspense>
     </div>
   );
 }

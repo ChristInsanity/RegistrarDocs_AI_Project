@@ -803,6 +803,22 @@ export function StaffRequestDetailsModal({
                         {request.requesterEmail || "Not available"}
                       </dd>
                     </div>
+                    <div>
+                      <dt className="font-semibold text-slate-500">
+                        Institute
+                      </dt>
+                      <dd className="mt-0.5 font-medium text-[#25352B]">
+                        {request.requesterInstitute || "Not provided"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-500">
+                        Program
+                      </dt>
+                      <dd className="mt-0.5 font-medium text-[#25352B]">
+                        {request.requesterProgram || "Not provided"}
+                      </dd>
+                    </div>
                   </dl>
                 </div>
 

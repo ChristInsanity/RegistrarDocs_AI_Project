@@ -25,6 +25,8 @@ export interface DocumentRequestRow {
   collection_instructions?: string | null;
   ready_for_release_at?: string | null;
   released_at?: string | null;
+  requester_institute?: string | null;
+  requester_program?: string | null;
 }
 
 export interface RequesterDocumentRequestDetail
@@ -38,6 +40,8 @@ export interface RequesterDocumentRequestDetail
   collectionInstructions: string | null;
   readyForReleaseAt: string | null;
   releasedAt: string | null;
+  requesterInstitute: string | null;
+  requesterProgram: string | null;
   updatedAt: string;
 }
 
@@ -57,6 +61,8 @@ function toRequestDetail(
     collectionInstructions: row.collection_instructions ?? null,
     readyForReleaseAt: row.ready_for_release_at ?? null,
     releasedAt: row.released_at ?? null,
+    requesterInstitute: row.requester_institute ?? null,
+    requesterProgram: row.requester_program ?? null,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,
     status: row.status,
@@ -167,6 +173,8 @@ export interface CreateDocumentRequestInput {
   copies: number;
   additionalNotes: string | null;
   idempotencyKey: string | null;
+  requesterInstitute?: string | null;
+  requesterProgram?: string | null;
 }
 
 export async function createDocumentRequest(
@@ -188,21 +196,42 @@ export async function createDocumentRequest(
   const referenceNumber = await generateReferenceNumber();
   const admin = createSupabaseAdminClient();
 
-  const { data, error } = await admin
+  const basePayload = {
+    reference_number: referenceNumber,
+    requester_id: input.requesterId,
+    document_type_code: input.documentTypeCode,
+    document_type_name: input.documentTypeName,
+    purpose: input.purpose.trim(),
+    copies: input.copies,
+    additional_notes: input.additionalNotes?.trim() || null,
+    status: "pending",
+    idempotency_key: input.idempotencyKey,
+  };
+
+  let { data, error } = await admin
     .from("document_requests")
     .insert({
-      reference_number: referenceNumber,
-      requester_id: input.requesterId,
-      document_type_code: input.documentTypeCode,
-      document_type_name: input.documentTypeName,
-      purpose: input.purpose.trim(),
-      copies: input.copies,
-      additional_notes: input.additionalNotes?.trim() || null,
-      status: "pending",
-      idempotency_key: input.idempotencyKey,
+      ...basePayload,
+      requester_institute: input.requesterInstitute ?? null,
+      requester_program: input.requesterProgram ?? null,
     })
     .select("*")
     .single();
+
+  // Graceful fallback if migration 0009 snapshot columns are not yet applied
+  if (
+    error &&
+    (error.message.toLowerCase().includes("requester_institute") ||
+      error.message.toLowerCase().includes("requester_program"))
+  ) {
+    const retry = await admin
+      .from("document_requests")
+      .insert(basePayload)
+      .select("*")
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error || !data) {
     // Handle concurrent idempotency race cleanly
