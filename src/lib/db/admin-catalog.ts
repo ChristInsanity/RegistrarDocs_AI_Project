@@ -1,3 +1,4 @@
+import { OFFICIAL_DNSC_KNOWLEDGE_SEED } from "@/lib/ai/dnsc-knowledge-seed";
 import { recordAdminAuditLog } from "@/lib/db/admin-audit";
 import { FAQ_ITEMS } from "@/lib/landing-data";
 import {
@@ -63,6 +64,10 @@ export interface AdminKnowledgeSourceRecord {
   sourceUrl: string | null;
   contentSummary: string;
   isEnabled: boolean;
+  isVerified: boolean;
+  lastVerifiedAt: string | null;
+  documentTypeCode: string | null;
+  checklistVerified: boolean;
   createdByName: string | null;
   createdAt: string;
   updatedAt: string;
@@ -837,6 +842,10 @@ type RawKnowledgeSource = {
   source_url: string | null;
   content_summary: string;
   is_enabled: boolean;
+  is_verified?: boolean | null;
+  last_verified_at?: string | null;
+  document_type_code?: string | null;
+  checklist_verified?: boolean | null;
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
@@ -853,6 +862,13 @@ function mapKnowledgeSource(
     sourceUrl: row.source_url,
     contentSummary: row.content_summary,
     isEnabled: row.is_enabled,
+    isVerified: typeof row.is_verified === "boolean" ? row.is_verified : true,
+    lastVerifiedAt: row.last_verified_at ?? null,
+    documentTypeCode: row.document_type_code ?? null,
+    checklistVerified:
+      typeof row.checklist_verified === "boolean"
+        ? row.checklist_verified
+        : true,
     createdByName: row.created_by_name,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -878,6 +894,70 @@ export async function listAdminKnowledgeSources(): Promise<{
   };
 }
 
+export async function seedOfficialDnscKnowledgeSources(
+  adminUser: SafeUser
+): Promise<
+  | { ok: true; insertedCount: number; sources: AdminKnowledgeSourceRecord[] }
+  | { ok: false; status: number; error: string }
+> {
+  const admin = createSupabaseAdminClient();
+  let insertedCount = 0;
+
+  for (const entry of OFFICIAL_DNSC_KNOWLEDGE_SEED) {
+    const { data: existing } = await admin
+      .from("ai_knowledge_sources")
+      .select("id")
+      .eq("title", entry.title)
+      .maybeSingle();
+
+    if (existing) continue;
+
+    let { error } = await admin.from("ai_knowledge_sources").insert({
+      title: entry.title,
+      category: entry.category,
+      source_type: entry.sourceType,
+      source_url: entry.sourceUrl,
+      content_summary: entry.contentSummary,
+      is_enabled: entry.isEnabled,
+      is_verified: entry.isVerified,
+      last_verified_at: entry.lastVerifiedAt,
+      document_type_code: entry.documentTypeCode ?? null,
+      checklist_verified: entry.checklistVerified,
+      seed_key: entry.seedKey,
+      created_by: adminUser.id,
+      created_by_name: adminUser.fullName,
+    });
+
+    if (error && isMissingTable(error.message)) {
+      const fb = await admin.from("ai_knowledge_sources").insert({
+        title: entry.title,
+        category: entry.category,
+        source_type: entry.sourceType,
+        source_url: entry.sourceUrl,
+        content_summary: entry.contentSummary,
+        is_enabled: entry.isEnabled,
+        created_by: adminUser.id,
+        created_by_name: adminUser.fullName,
+      });
+      error = fb.error;
+    }
+
+    if (!error) insertedCount += 1;
+  }
+
+  await recordAdminAuditLog({
+    actor: adminUser,
+    action: "knowledge_base_seeded",
+    entityType: "ai_knowledge_source",
+    entityLabel: "Official DNSC Registrar Knowledge Base",
+    description: `Seeded ${insertedCount} official DNSC Registrar knowledge entries.`,
+    newValue: { insertedCount },
+  });
+
+  const refreshed = await listAdminKnowledgeSources();
+  return { ok: true, insertedCount, sources: refreshed.sources };
+}
+
 export async function createAdminKnowledgeSource(input: {
   title: string;
   category?: string;
@@ -885,6 +965,9 @@ export async function createAdminKnowledgeSource(input: {
   sourceUrl?: string;
   contentSummary: string;
   isEnabled?: boolean;
+  isVerified?: boolean;
+  lastVerifiedAt?: string;
+  checklistVerified?: boolean;
   adminUser: SafeUser;
 }): Promise<
   | { ok: true; source: AdminKnowledgeSourceRecord }
@@ -899,7 +982,7 @@ export async function createAdminKnowledgeSource(input: {
   }
 
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("ai_knowledge_sources")
     .insert({
       title: input.title.trim(),
@@ -908,18 +991,41 @@ export async function createAdminKnowledgeSource(input: {
       source_url: input.sourceUrl?.trim() || null,
       content_summary: input.contentSummary.trim(),
       is_enabled: input.isEnabled !== false,
+      is_verified: input.isVerified !== false,
+      last_verified_at:
+        input.lastVerifiedAt?.trim() || new Date().toISOString().slice(0, 10),
+      checklist_verified: input.checklistVerified !== false,
       created_by: input.adminUser.id,
       created_by_name: input.adminUser.fullName,
     })
     .select("*")
     .single();
 
+  if (error && isMissingTable(error.message)) {
+    const fb = await admin
+      .from("ai_knowledge_sources")
+      .insert({
+        title: input.title.trim(),
+        category: input.category?.trim() || "Registrar Information",
+        source_type: input.sourceType || "official_document",
+        source_url: input.sourceUrl?.trim() || null,
+        content_summary: input.contentSummary.trim(),
+        is_enabled: input.isEnabled !== false,
+        created_by: input.adminUser.id,
+        created_by_name: input.adminUser.fullName,
+      })
+      .select("*")
+      .single();
+    data = fb.data;
+    error = fb.error;
+  }
+
   if (error || !data) {
     return {
       ok: false,
       status: isMissingTable(error?.message) ? 503 : 500,
       error: isMissingTable(error?.message)
-        ? "Please run migration 0005_admin_management_and_audit.sql in Supabase."
+        ? "Please run migration 0005/0007 in Supabase."
         : "Unable to create AI knowledge source.",
     };
   }
@@ -932,7 +1038,11 @@ export async function createAdminKnowledgeSource(input: {
     entityId: created.id,
     entityLabel: created.title,
     description: `Added approved AI knowledge source "${created.title}".`,
-    newValue: { title: created.title, isEnabled: created.isEnabled },
+    newValue: {
+      title: created.title,
+      isEnabled: created.isEnabled,
+      isVerified: created.isVerified,
+    },
   });
 
   return { ok: true, source: created };
@@ -946,6 +1056,9 @@ export async function updateAdminKnowledgeSource(input: {
   sourceUrl?: string;
   contentSummary?: string;
   isEnabled?: boolean;
+  isVerified?: boolean;
+  lastVerifiedAt?: string;
+  checklistVerified?: boolean;
   adminUser: SafeUser;
 }): Promise<
   | { ok: true; source: AdminKnowledgeSourceRecord }
@@ -974,13 +1087,33 @@ export async function updateAdminKnowledgeSource(input: {
   if (typeof input.contentSummary === "string" && input.contentSummary.trim())
     payload.content_summary = input.contentSummary.trim();
   if (typeof input.isEnabled === "boolean") payload.is_enabled = input.isEnabled;
+  if (typeof input.isVerified === "boolean")
+    payload.is_verified = input.isVerified;
+  if (typeof input.lastVerifiedAt === "string")
+    payload.last_verified_at = input.lastVerifiedAt.trim() || null;
+  if (typeof input.checklistVerified === "boolean")
+    payload.checklist_verified = input.checklistVerified;
 
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("ai_knowledge_sources")
     .update(payload)
     .eq("id", input.id)
     .select("*")
     .single();
+
+  if (error && isMissingTable(error.message)) {
+    delete payload.is_verified;
+    delete payload.last_verified_at;
+    delete payload.checklist_verified;
+    const fb = await admin
+      .from("ai_knowledge_sources")
+      .update(payload)
+      .eq("id", input.id)
+      .select("*")
+      .single();
+    data = fb.data;
+    error = fb.error;
+  }
 
   if (error || !data) {
     return { ok: false, status: 500, error: "Unable to update knowledge source." };
@@ -999,8 +1132,8 @@ export async function updateAdminKnowledgeSource(input: {
     entityId: updated.id,
     entityLabel: updated.title,
     description: `Updated AI knowledge source "${updated.title}".`,
-    previousValue: { isEnabled: prev.isEnabled },
-    newValue: { isEnabled: updated.isEnabled },
+    previousValue: { isEnabled: prev.isEnabled, isVerified: prev.isVerified },
+    newValue: { isEnabled: updated.isEnabled, isVerified: updated.isVerified },
   });
 
   return { ok: true, source: updated };

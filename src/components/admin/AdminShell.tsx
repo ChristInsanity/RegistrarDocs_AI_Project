@@ -14,6 +14,7 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  MessageSquareText,
   ShieldCheck,
   UserCheck,
   Users,
@@ -99,6 +100,12 @@ const NAV_GROUPS = [
         label: "Reports & Analytics",
         href: "/dashboard/admin/reports",
         icon: BarChart3,
+        exact: false,
+      },
+      {
+        label: "AI Feedback Analyzer",
+        href: "/dashboard/admin/feedback-analyzer",
+        icon: MessageSquareText,
         exact: false,
       },
       {

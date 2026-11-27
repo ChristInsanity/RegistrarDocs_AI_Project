@@ -3,6 +3,7 @@ import { requireApiAuth } from "@/lib/auth/rbac";
 import {
   createAdminKnowledgeSource,
   listAdminKnowledgeSources,
+  seedOfficialDnscKnowledgeSources,
   updateAdminKnowledgeSource,
   type KnowledgeSourceType,
 } from "@/lib/db/admin-catalog";
@@ -34,6 +35,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
   }
 
+  if (body.action === "seed_official_dnsc") {
+    const seeded = await seedOfficialDnscKnowledgeSources(auth.user);
+    if (!seeded.ok) {
+      return NextResponse.json(
+        { error: seeded.error },
+        { status: seeded.status }
+      );
+    }
+    return NextResponse.json(seeded, { status: 200 });
+  }
+
   const sourceType =
     typeof body.sourceType === "string" &&
     (ALLOWED_TYPES as readonly string[]).includes(body.sourceType)
@@ -48,6 +60,10 @@ export async function POST(request: Request) {
     contentSummary:
       typeof body.contentSummary === "string" ? body.contentSummary : "",
     isEnabled: body.isEnabled !== false,
+    isVerified: body.isVerified !== false,
+    lastVerifiedAt:
+      typeof body.lastVerifiedAt === "string" ? body.lastVerifiedAt : undefined,
+    checklistVerified: body.checklistVerified !== false,
     adminUser: auth.user,
   });
 
@@ -91,6 +107,14 @@ export async function PATCH(request: Request) {
     contentSummary:
       typeof body.contentSummary === "string" ? body.contentSummary : undefined,
     isEnabled: typeof body.isEnabled === "boolean" ? body.isEnabled : undefined,
+    isVerified:
+      typeof body.isVerified === "boolean" ? body.isVerified : undefined,
+    lastVerifiedAt:
+      typeof body.lastVerifiedAt === "string" ? body.lastVerifiedAt : undefined,
+    checklistVerified:
+      typeof body.checklistVerified === "boolean"
+        ? body.checklistVerified
+        : undefined,
     adminUser: auth.user,
   });
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Bot,
   ChevronDown,
   ClipboardList,
   FilePlus2,
@@ -41,6 +42,12 @@ const REQUESTER_NAV_ITEMS = [
     label: "My Requests",
     href: "/dashboard/requester/requests",
     icon: ClipboardList,
+    exact: false,
+  },
+  {
+    label: "AI Assistant",
+    href: "/dashboard/requester/assistant",
+    icon: Bot,
     exact: false,
   },
   {
