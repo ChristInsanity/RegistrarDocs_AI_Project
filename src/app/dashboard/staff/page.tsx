@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ClipboardList, ShieldCheck } from "lucide-react";
-import { DnscAcademicCalendarSection } from "@/components/requester/DnscAcademicCalendarSection";
+import { OfficeCalendarWorkspace } from "@/components/calendar/OfficeCalendarWorkspace";
 import { StaffOverviewCards } from "@/components/staff/StaffOverviewCards";
 import { StaffRecentAttentionSection } from "@/components/staff/StaffRecentAttentionSection";
 import { requirePageRole } from "@/lib/auth/rbac";
+import { listCalendarEventsForUser } from "@/lib/db/calendar";
 import { listStaffDocumentRequests } from "@/lib/db/staff-requests";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,11 @@ export const metadata: Metadata = {
 
 export default async function StaffDashboardPage() {
   const user = await requirePageRole("staff");
-  const result = await listStaffDocumentRequests();
+  const [result, calendarData] = await Promise.all([
+    listStaffDocumentRequests(),
+    listCalendarEventsForUser(user),
+  ]);
+  const initialDateIso = new Date().toISOString();
 
   const attentionRequests = result.ok
     ? result.requests
@@ -83,8 +88,15 @@ export default async function StaffDashboardPage() {
         error={result.ok ? null : result.error}
       />
 
-      {/* DNSC Academic Calendar */}
-      <DnscAcademicCalendarSection />
+      {/* DNSC Academic Calendar & Staff Schedule */}
+      <OfficeCalendarWorkspace
+        role="staff"
+        currentUserId={user.id}
+        initialEvents={calendarData.events}
+        initialReminders={calendarData.reminders}
+        initialSchemaReady={calendarData.schemaReady}
+        initialDateIso={initialDateIso}
+      />
     </div>
   );
 }

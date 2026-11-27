@@ -5,6 +5,10 @@ import { RegistrarAnnouncementsSection } from "@/components/requester/RegistrarA
 import { RequesterWelcomeBanner } from "@/components/requester/RequesterWelcomeBanner";
 import { RequestOverviewCards } from "@/components/requester/RequestOverviewCards";
 import { requirePageRole } from "@/lib/auth/rbac";
+import {
+  listActivePublicAnnouncements,
+  listCalendarEventsForUser,
+} from "@/lib/db/calendar";
 import { getRequesterDashboardData } from "@/lib/requester/dashboard-data";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +21,12 @@ export const metadata: Metadata = {
 
 export default async function RequesterDashboardPage() {
   const user = await requirePageRole("requester");
-  const dashboardData = await getRequesterDashboardData(user.id);
+  const [dashboardData, calendarData, announcements] = await Promise.all([
+    getRequesterDashboardData(user.id),
+    listCalendarEventsForUser(user),
+    listActivePublicAnnouncements(),
+  ]);
+  const initialDateIso = new Date().toISOString();
 
   return (
     <div className="space-y-5">
@@ -28,9 +37,12 @@ export default async function RequesterDashboardPage() {
         requestsModuleEnabled={dashboardData.requestsModuleEnabled}
       />
 
-      <RegistrarAnnouncementsSection />
+      <RegistrarAnnouncementsSection announcements={announcements} />
 
-      <DnscAcademicCalendarSection />
+      <DnscAcademicCalendarSection
+        events={calendarData.events}
+        initialDateIso={initialDateIso}
+      />
 
       <HelpfulInformationSection />
     </div>

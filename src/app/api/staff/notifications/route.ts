@@ -5,6 +5,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/lib/db/notifications";
+import { processDueCalendarReminders } from "@/lib/db/calendar";
 import type { AuthErrorCode } from "@/types/auth";
 
 export async function GET(request: Request) {
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
   const unreadOnly = searchParams.get("unreadOnly") === "true";
 
   try {
+    await processDueCalendarReminders().catch(() => {});
     const result = await listRecipientNotifications(auth.user.id, {
       limit: Number.isFinite(limitParam) ? limitParam : 20,
       offset: Number.isFinite(offsetParam) ? offsetParam : 0,

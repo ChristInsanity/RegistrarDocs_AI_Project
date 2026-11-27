@@ -21,7 +21,9 @@ export interface RequesterNotificationItem {
     | "missing_requirements"
     | "processing_update"
     | "ready_for_release"
-    | "collection_instructions";
+    | "collection_instructions"
+    | "calendar_reminder"
+    | "public_announcement";
   title: string;
   message: string;
   createdAt: string;

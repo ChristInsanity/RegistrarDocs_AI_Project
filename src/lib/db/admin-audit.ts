@@ -27,7 +27,8 @@ export interface RecordAdminAuditInput {
     | "document_type"
     | "requirement"
     | "faq"
-    | "ai_knowledge_source";
+    | "ai_knowledge_source"
+    | "calendar_event";
   entityId?: string | null;
   entityLabel?: string | null;
   description: string;

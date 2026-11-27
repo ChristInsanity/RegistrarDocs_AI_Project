@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { requirePageRole } from "@/lib/auth/rbac";
 import { getAdminDashboardOverview } from "@/lib/db/admin-users";
+import { listCalendarEventsForUser } from "@/lib/db/calendar";
+import { OfficeCalendarWorkspace } from "@/components/calendar/OfficeCalendarWorkspace";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +49,12 @@ function formatDateTime(iso: string): string {
 }
 
 export default async function AdminDashboardPage() {
-  await requirePageRole("admin");
-  const overview = await getAdminDashboardOverview();
+  const adminUser = await requirePageRole("admin");
+  const [overview, calendarData] = await Promise.all([
+    getAdminDashboardOverview(),
+    listCalendarEventsForUser(adminUser),
+  ]);
+  const initialDateIso = new Date().toISOString();
 
   const summaryCards = [
     {
@@ -200,6 +206,16 @@ export default async function AdminDashboardPage() {
           })}
         </div>
       </section>
+
+      {/* Academic Calendar, Office Scheduling & Announcements — Directly Below Summary Cards */}
+      <OfficeCalendarWorkspace
+        role="admin"
+        currentUserId={adminUser.id}
+        initialEvents={calendarData.events}
+        initialReminders={calendarData.reminders}
+        initialSchemaReady={calendarData.schemaReady}
+        initialDateIso={initialDateIso}
+      />
 
       {/* Pending Approvals + Recent Admin Activities */}
       <div className="grid gap-5 lg:grid-cols-2">
